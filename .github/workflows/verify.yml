@@ -159,3 +159,64 @@ jobs:
             "plymouth ask-for-password --prompt='Unlock disk (ci_crypt)' &" \
             KEYS:hunter2 ENTER
           desktop/tools/check-plymouth-shots.py desktop/tools/ci
+
+  kwin-shader:
+    name: The FacetUI GLSL compiles, and computes the right thing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install numpy pillow
+
+      # A GLES 3 driver. llvmpipe is the same Mesa shader compiler a GPU would
+      # use, and the numeric check does not care how fast the pixels arrive.
+      - name: A real GL driver, and the headers to talk to it
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1-mesa-dev libgles2-mesa-dev \
+                                  libgl1-mesa-dri
+      - run: desktop/tools/validate-kwin-shaders.py
+
+      # Rendered, but NOT diffed against the committed image. The preview
+      # draws text, so its pixels depend on the freetype and fontconfig on the
+      # machine, and llvmpipe's on the Mesa version -- a byte comparison would
+      # be green on the machine that produced it and red on this one, which is
+      # a check that only ever cries wolf. What the shader COMPUTES is pinned
+      # by validate-kwin-shaders.py above, against the NumPy, to 2e-4.
+      # This step is here to catch the renderer crashing.
+      - run: desktop/tools/render-kwin-glass.py --out /tmp/kwin-glass.png
+
+  kwin-effect:
+    name: The effect builds, and KWin accepts the plugin
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # Ubuntu 24.04 has no Plasma 6. KDE neon is that same Ubuntu with Plasma
+      # 6 on top, which is what makes a real build possible here at all --
+      # everything below this line was written against an API that could not be
+      # compiled until these packages existed.
+      - name: KWin 6, from KDE neon
+        run: |
+          set -eux
+          curl -fsSL https://archive.neon.kde.org/public.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/neon.gpg
+          echo "deb [signed-by=/usr/share/keyrings/neon.gpg] \
+                http://archive.neon.kde.org/user noble main" \
+            | sudo tee /etc/apt/sources.list.d/neon.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            kwin-dev kwin-wayland extra-cmake-modules qt6-base-dev \
+            libkf6coreaddons-dev libkf6config-dev \
+            dbus-bin libgl1-mesa-dri
+
+      # Fast, and it catches the one thing the build cannot: this also runs
+      # against the KWin the effect is compiled against, so a mismatch here
+      # means the two disagree about what was installed.
+      - run: desktop/tools/check-kwin-api.py
+
+      # The real thing: compile, install, start KWin, and see what it does with
+      # the plugin. It reports honestly that it cannot prove the effect DRAWS
+      # correctly without a GPU -- that part is settled by kwin-shader above.
+      - run: desktop/tools/run-kwin-effect.sh

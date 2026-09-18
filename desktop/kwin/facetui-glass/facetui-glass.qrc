@@ -1,0 +1,18 @@
+<!--
+    SPDX-FileCopyrightText: 2026 The octagonOS Project
+    SPDX-License-Identifier: Apache-2.0
+
+    The shader is compiled into the plugin rather than installed beside it.
+    KWin loads it with a ":/" resource path, so there is no file to go missing
+    and no path to get wrong at install time. A shader KWin cannot read is an
+    effect that silently does nothing.
+
+    No double hyphen appears in this comment: XML forbids it inside a comment
+    body, and rcc rejects the whole file for it. The same mistake was made in
+    the Android overlays, where aapt2 rejected them for exactly this.
+-->
+<RCC>
+    <qresource prefix="/effects/facetui-glass">
+        <file>shaders/facetui-glass.frag</file>
+    </qresource>
+</RCC>

@@ -9,7 +9,7 @@ imported by both, so the two cannot drift apart.
 | | | |
 |---|---|---|
 | [**`mobile/`**](mobile/) | An Android 17 GSI, for phones with physical keyboards and for slabs, from one image | **Beta. Verified, never run** |
-| [**`desktop/`**](desktop/) | An Ubuntu-based Linux distribution carrying the same design language | **Started. Boot splash built and run** |
+| [**`desktop/`**](desktop/) | An Ubuntu-based Linux distribution carrying the same design language | **Started. Boot splash and compositor effect built and run** |
 | [**`shared/`**](shared/) | The FacetUI core both editions import | — |
 
 ![The octagonOS boot animation](mobile/docs/preview/bootanimation-arc.png)
@@ -28,12 +28,20 @@ The single largest risk was retired late: **both AGSL shaders now compile**
 under Skia's own SkSL compiler, offline. That was the one failure that would
 have surfaced as a blank screen after a multi-hour build.
 
-On the desktop side one thing *has* run: the
+On the desktop side, two things *have* run. The
 [Plymouth boot splash](desktop/plymouth/) was installed against a real
 `plymouthd`, driven with real keystrokes and screenshotted — including the
 encrypted-disk passphrase path, which is the part of a boot theme that ruins a
-machine when it is wrong. Four bugs came out of running it that reading the
-script had not found.
+machine when it is wrong. The [KWin glass effect](desktop/kwin/) compiles
+against KWin 6.7.5 and is accepted by KWin as a plugin, and its shader is
+checked against `shared/facetui/facet_math.py` to 1.7e-07 in a real GL driver
+— so the boot screen, the shade, the app icons and now the desktop's panels
+are provably lit by one piece of maths.
+
+Both were written, read carefully, and still wrong in ways only running them
+showed — a theme that drew its background and stopped, sprites silently
+discarded, a callback that never fires, a shader signature that changed between
+KWin releases. Each is written down where its fix lives.
 
 ## Why this is one repository
 

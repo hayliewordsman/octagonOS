@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Category": "Appearance",
+        "Description": "Lights system surfaces as FacetUI glass: a specular edge on the panel, and a darkened rim on every floating surface",
+        "EnabledByDefault": true,
+        "License": "Apache-2.0",
+        "Name": "FacetUI Glass"
+    },
+    "org.kde.kwin.effect": {
+        "internal": false
+    }
+}

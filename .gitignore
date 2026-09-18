@@ -17,3 +17,8 @@ desktop/tools/*.xwd
 
 # The Plymouth theme IS committed, like the boot animation: it is generated
 # reproducibly from committed sources, and CI rebuilds it and diffs.
+
+# Out-of-tree build trees for the KWin effect. The sources and the CMakeLists
+# are the deliverable; the .so must be built against the KWin it will run on,
+# so a committed binary would be wrong by the next KWin release.
+desktop/kwin/*/build/

@@ -4,17 +4,20 @@ An Ubuntu-based Linux distribution carrying FacetUI — the same glass design
 language as the mobile edition, from the same maths in
 [`shared/facetui`](../shared/facetui).
 
-**Started.** The boot splash is built, and it is the first piece of octagonOS
-that has actually been *run* rather than verified.
+**Started.** The boot splash and the compositor effect are built, and they are
+the first pieces of octagonOS that have actually been *run* rather than
+verified.
 
 ![The Plymouth theme](docs/preview/plymouth.png)
+
+![Blur and tint alone, and the same surfaces with facetui-glass](docs/preview/kwin-glass.png)
 
 ## Status
 
 | | |
 |---|---|
 | [Plymouth theme](plymouth/) | **Built and run.** The mark, the passphrase prompt, messages, teardown |
-| KWin blur effect | Not started — the AGSL shaders ported to GLSL |
+| [KWin glass effect](kwin/) | **Built and loaded.** Compiles against KWin 6.7.5; KWin accepts the plugin. Drawing needs a GPU |
 | Icon theme | Not started |
 | Plasma look-and-feel | Not started |
 | ISO | Not started |
@@ -50,7 +53,10 @@ with real keystrokes and screenshotted, and four bugs came out of doing that
 which no amount of reading the script had found.
 
 That is the standard this edition is held to: seen working, not verified as far
-as possible.
+as possible. Where it cannot be met, it is named rather than blurred — the
+compositor effect builds, loads and is accepted by KWin, and whether it *draws*
+correctly needs a GPU this has not had. Its arithmetic is settled separately,
+against a real driver.
 
 ## What ported, and what did not
 
@@ -59,7 +65,7 @@ as possible.
 | `facet_math.py` | Unchanged — already NumPy |
 | The mark renderer | Unchanged — `shared/facetui/mark.py`, shared with the Android boot animation |
 | The boot animation | A Plymouth theme, [`plymouth/`](plymouth/) |
-| The AGSL shaders | A KWin GLSL effect; AGSL is close enough to port nearly verbatim |
+| The AGSL shaders | A KWin GLSL effect, [`kwin/facetui-glass`](kwin/facetui-glass) — transcribed nearly verbatim, and checked against the NumPy to 1.7e-07 |
 | The icon pack | A freedesktop icon theme. The glyphs are already vectors, the tile already a PNG |
 | The depth model, `L0`–`L4` | Blur strength per surface type |
 | The octagon, the palette, the hairline | Directly |
@@ -72,5 +78,6 @@ form-factor detection — everything shaped by Android rather than by FacetUI.
 | | |
 |---|---|
 | [`plymouth/`](plymouth/) | The boot splash |
+| [`kwin/`](kwin/) | The compositor effect: FacetUI's two shaders |
 | [`tools/`](tools/) | Verifiers, and the harness that runs a theme for real |
 | `docs/preview/` | Screenshots, taken by those tools |
