@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     FacetUIIcons - the octagonOS icon pack.
+
+     Ships as a normal APK rather than an RRO, because an RRO can only override
+     resources a target already defines and cannot add new ones. Every drawable
+     in here is new.
+
+     The pack is read directly by the FacetUI icon engine
+     (patches/iconloader/0001), which looks it up by package name. The
+     intent filters below are the conventional icon-pack declarations, so that
+     a launcher other than the built-in one can also find and use it.
+
+     Res is generated: run iconpack/make-icons.py, do not hand-edit.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.octagonos.facetui.icons">
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/facetui_generic"
+        android:hasCode="false"
+        android:allowBackup="false">
+
+        <meta-data
+            android:name="dev.octagonos.facetui.icons.APPFILTER"
+            android:resource="@xml/appfilter" />
+
+        <activity
+            android:name=".IconPackInfo"
+            android:exported="true"
+            android:enabled="false">
+            <intent-filter>
+                <action android:name="org.adw.launcher.THEMES" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.novalauncher.THEME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

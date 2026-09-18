@@ -1,0 +1,257 @@
+diff --git a/iconloaderlib/src/com/android/launcher3/icons/IconProvider.java b/iconloaderlib/src/com/android/launcher3/icons/IconProvider.java
+index c79bedd..0632416 100644
+--- a/iconloaderlib/src/com/android/launcher3/icons/IconProvider.java
++++ b/iconloaderlib/src/com/android/launcher3/icons/IconProvider.java
+@@ -42,6 +42,7 @@ import androidx.annotation.Nullable;
+ import androidx.core.os.BuildCompat;
+ 
+ import com.android.launcher3.icons.cache.CachingLogic;
++import com.android.launcher3.icons.facetui.FacetUiIcons;
+ import com.android.launcher3.util.ComponentKey;
+ 
+ import java.util.Calendar;
+@@ -131,6 +132,21 @@ public class IconProvider {
+         ThemeData td = getThemeDataForPackage(packageName);
+ 
+         Drawable icon = null;
++
++        // FacetUI: a purpose-drawn icon for this component, if the pack has
++        // one. Checked first, and returned as-is: it already carries the glass
++        // and recomposing it would put one octagon inside another.
++        FacetUiIcons facetUi = FacetUiIcons.get(mContext);
++        if (facetUi != null) {
++            String component = info instanceof ComponentInfo
++                    ? packageName + "/" + ((ComponentInfo) info).name
++                    : packageName;
++            icon = facetUi.curatedIcon(component, packageName, iconDpi);
++            if (icon != null) {
++                return icon;
++            }
++        }
++
+         if (mCalendar != null && mCalendar.getPackageName().equals(packageName)) {
+             icon = loadCalendarDrawable(iconDpi, td);
+         } else if (mClock != null && mClock.getPackageName().equals(packageName)) {
+@@ -146,9 +162,26 @@ public class IconProvider {
+                 }
+             }
+         }
++
++        // FacetUI: everything the pack does not curate -- which is every app
++        // the user installs -- is recomposed onto the same glass. This is the
++        // step that makes the theming total rather than a fixed list.
++        //
++        // Deliberately not applied to the calendar and clock drawables above:
++        // both animate by swapping their own contents, and wrapping them would
++        // freeze them at whatever they showed when the icon was first loaded.
++        if (facetUi != null && !isDynamicIcon(packageName)) {
++            icon = facetUi.wrap(icon, iconDpi);
++        }
+         return icon;
+     }
+ 
++    /** Whether this package draws its own icon and must not be recomposed. */
++    private boolean isDynamicIcon(String packageName) {
++        return (mCalendar != null && mCalendar.getPackageName().equals(packageName))
++                || (mClock != null && mClock.getPackageName().equals(packageName));
++    }
++
+     protected ThemeData getThemeDataForPackage(String packageName) {
+         return null;
+     }
+diff --git a/iconloaderlib/src/com/android/launcher3/icons/facetui/FacetUiIcons.kt b/iconloaderlib/src/com/android/launcher3/icons/facetui/FacetUiIcons.kt
+new file mode 100644
+index 0000000..0a13887
+--- /dev/null
++++ b/iconloaderlib/src/com/android/launcher3/icons/facetui/FacetUiIcons.kt
+@@ -0,0 +1,190 @@
++/*
++ * Copyright (C) 2026 The octagonOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.android.launcher3.icons.facetui
++
++import android.content.Context
++import android.content.pm.PackageManager
++import android.content.res.Resources
++import android.graphics.drawable.AdaptiveIconDrawable
++import android.graphics.drawable.Drawable
++import android.graphics.drawable.InsetDrawable
++import android.util.Log
++import org.xmlpull.v1.XmlPullParser
++
++/**
++ * Applies FacetUI to every app icon.
++ *
++ * Two mechanisms, and the second is the one that matters:
++ *
++ *  1. **Curated.** The FacetUIIcons pack maps a component to a purpose-drawn
++ *     FacetUI icon. Good, but finite -- it only ever covers apps somebody has
++ *     drawn a glyph for.
++ *
++ *  2. **Procedural.** Everything else is recomposed: the app's own artwork is
++ *     lifted onto the same glass octagon the curated icons use. That is what
++ *     makes the coverage total rather than a list that needs extending every
++ *     time a user installs something.
++ *
++ * The recomposition is deliberately not a filter over the finished icon. It
++ * builds a genuine [AdaptiveIconDrawable] whose background is the glass tile
++ * and whose foreground is the app's own, so masking, shadows, monochrome
++ * extraction and every other downstream consumer keep working on it exactly as
++ * they would on an icon the app shipped that way.
++ *
++ * For an app that already ships an adaptive icon, only its *foreground* is
++ * taken. Keeping its background would put a coloured square inside the octagon;
++ * dropping it puts the app's own glyph on FacetUI's surface, which is the whole
++ * point.
++ *
++ * The glass tile is loaded from the pack rather than generated here, so the
++ * curated and the procedural icons are the same asset and cannot drift apart.
++ * With the pack absent this does nothing at all and icons are left alone --
++ * there is no second, approximate glass to maintain.
++ */
++class FacetUiIcons private constructor(
++    private val packRes: Resources,
++    private val packPackage: String,
++    private val tileId: Int,
++) {
++
++    /** component or package -> drawable name, read from the pack's appfilter. */
++    private val mapping: Map<String, String> by lazy { loadAppfilter() }
++
++    /**
++     * The curated icon for a component, or null if the pack does not carry one.
++     *
++     * @param component "package/class", as ComponentName.flattenToString writes it.
++     */
++    fun curatedIcon(component: String, packageName: String, iconDpi: Int): Drawable? {
++        val name = mapping[component] ?: mapping[packageName] ?: return null
++        val id = packRes.getIdentifier(name, "mipmap", packPackage)
++            .takeIf { it != 0 }
++            ?: packRes.getIdentifier(name, "drawable", packPackage)
++        if (id == 0) {
++            // The appfilter named a drawable the pack does not contain. Worth a
++            // line in the log: it means the two were built from different
++            // sources, which nothing else would reveal.
++            Log.w(TAG, "appfilter names missing drawable '$name' for $component")
++            return null
++        }
++        return runCatching { packRes.getDrawableForDensity(id, iconDpi, null) }
++            .getOrNull()
++    }
++
++    /**
++     * Recomposes an arbitrary icon onto the FacetUI glass.
++     *
++     * Returns the icon untouched if the tile is unavailable, so a broken or
++     * missing pack degrades to stock icons rather than to no icons.
++     */
++    fun wrap(icon: Drawable, iconDpi: Int): Drawable {
++        val tile = runCatching { packRes.getDrawableForDensity(tileId, iconDpi, null) }
++            .getOrNull() ?: return icon
++
++        val foreground: Drawable = when (icon) {
++            // Take the foreground only; see the class doc.
++            is AdaptiveIconDrawable -> icon.foreground ?: return icon
++            // A legacy icon is full-bleed square artwork with no safe zone of
++            // its own, so it has to be inset before it can act as a foreground
++            // or the mask will cut through it.
++            else -> InsetDrawable(icon, LEGACY_INSET)
++        }
++        return AdaptiveIconDrawable(tile, foreground)
++    }
++
++    private fun loadAppfilter(): Map<String, String> {
++        val id = packRes.getIdentifier("appfilter", "xml", packPackage)
++        if (id == 0) {
++            Log.w(TAG, "pack $packPackage has no res/xml/appfilter.xml")
++            return emptyMap()
++        }
++        val out = HashMap<String, String>()
++        try {
++            packRes.getXml(id).use { parser ->
++                while (parser.next() != XmlPullParser.END_DOCUMENT) {
++                    if (parser.eventType != XmlPullParser.START_TAG) continue
++                    if (parser.name != "item") continue
++                    val component = parser.getAttributeValue(null, "component") ?: continue
++                    val drawable = parser.getAttributeValue(null, "drawable") ?: continue
++                    // Entries are written either bare, or wrapped as
++                    // ComponentInfo{pkg/cls}; accept both and store the inside.
++                    out[component.removePrefix("ComponentInfo{").removeSuffix("}")] = drawable
++                }
++            }
++        } catch (e: Exception) {
++            // A malformed appfilter must not take the launcher down with it.
++            // Procedural theming does not depend on this map, so an empty one
++            // still leaves every icon themed.
++            Log.e(TAG, "could not read appfilter from $packPackage", e)
++            return emptyMap()
++        }
++        return out
++    }
++
++    companion object {
++        private const val TAG = "FacetUiIcons"
++
++        /** The pack APK. Absent on a build that does not ship it. */
++        private const val PACK_PACKAGE = "dev.octagonos.facetui.icons"
++
++        /**
++         * Inset applied to legacy square artwork before it is used as an
++         * adaptive foreground, as a fraction of the drawable. 0.18 keeps the
++         * artwork inside the 72/108 mask with a little room to spare.
++         */
++        private const val LEGACY_INSET = 0.18f
++
++        @Volatile private var instance: FacetUiIcons? = null
++        @Volatile private var resolved = false
++
++        /**
++         * The shared instance, or null if the pack is not installed.
++         *
++         * Resolved once. If the pack is not present at first call it will not
++         * be looked for again: it ships in the system image, so it cannot
++         * appear later, and retrying would mean a PackageManager round trip on
++         * every icon load for a build that will never have one.
++         */
++        @JvmStatic
++        fun get(context: Context): FacetUiIcons? {
++            instance?.let { return it }
++            if (resolved) return null
++            synchronized(this) {
++                instance?.let { return it }
++                if (resolved) return null
++                resolved = true
++                instance = create(context)
++                return instance
++            }
++        }
++
++        private fun create(context: Context): FacetUiIcons? {
++            val res = try {
++                context.packageManager.getResourcesForApplication(PACK_PACKAGE)
++            } catch (e: PackageManager.NameNotFoundException) {
++                Log.i(TAG, "$PACK_PACKAGE not installed; icons left unthemed")
++                return null
++            }
++            val tileId = res.getIdentifier("facetui_tile", "drawable", PACK_PACKAGE)
++            if (tileId == 0) {
++                Log.w(TAG, "$PACK_PACKAGE has no facetui_tile; icons left unthemed")
++                return null
++            }
++            return FacetUiIcons(res, PACK_PACKAGE, tileId)
++        }
++    }
++}

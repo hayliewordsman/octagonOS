@@ -7,6 +7,11 @@ An Android 17 GSI built on **FacetUI**, a glass design language, for phones with
 
 *The boot animation, rendered by evaluating FacetUI's own shader maths.*
 
+![The FacetUI icon set](docs/preview/facetui-icons.png)
+
+*App icons, from the same maths. Every app gets these, not just the ones drawn
+here — see [Icons](#icons-every-app-not-a-list).*
+
 ## Status — read this first
 
 **Beta, and nothing here has run on a phone.** No device, no emulator, no image
@@ -19,6 +24,8 @@ including everything that has not, is in **[docs/status.md](docs/status.md)**.
 | SystemUI patches (3) | **Apply cleanly** to a pristine `lineage-24.0` tree. Never compiled |
 | Keyboard glass patch | **Applies cleanly** to a pristine LatinIME tree. Never compiled |
 | RRO overlays (4) | Sources **validate** against their target trees. Never built — no SDK here |
+| Icon engine patch | **Applies cleanly** to a pristine icon-loader tree. Never compiled |
+| Icon pack | **Generated and verified.** 22 icons, 40 components, all checks pass. Never packaged — no SDK here |
 | Form-factor detection | **7/7 tests pass**, against synthetic bitmasks |
 | The AGSL shaders | **Never handed to a shader compiler.** Most likely thing to fail first |
 | The GSI itself | **Not built.** Needs 250–400 GB |
@@ -42,6 +49,7 @@ unrelated resource names.
 | Volume, power menu, bottom sheets | Pulled onto one depth tier | overlay |
 | Shade edge and rim | Two AGSL shaders | patch |
 | Status bar icons | Four modes, incl. a neutral privacy dot | patch |
+| **App icons — all of them** | Octagonal mask, a curated pack, and a procedural wrap for everything else | overlay **+** pack **+** patch |
 | Boot animation | Rendered from the same shader maths | generated |
 
 Notifications and the lockscreen are overlays rather than patches because
@@ -49,6 +57,38 @@ Notifications and the lockscreen are overlays rather than patches because
 that needed a SystemUI recompile a release ago now does not. That finding, and
 the three places Android 17 moved *against* us, are in
 [docs/facetui.md](docs/facetui.md).
+
+## Icons: every app, not a list
+
+Before this, app icons were the one part of the system FacetUI did not reach —
+a grid of unrelated circles and squircles sitting on a glass homescreen. Three
+layers fix that, and only the middle one is a list:
+
+**The shape.** `config_icon_mask` is a framework string that
+`AdaptiveIconDrawable` parses into the clip path applied to *every* adaptive
+icon on the device. Setting it to a regular octagon — corner cut
+`100/(2+√2)`, all eight sides `41.421` — makes every icon octagonal at once,
+system and third-party alike, with nothing done to any of them individually.
+
+**The curated pack.** [`iconpack/`](iconpack/) renders purpose-drawn glyphs onto
+a glass octagon generated from `facet_math.py`. 22 icons across 40 components.
+
+**The engine.** [`patches/iconloader/0001`](patches/iconloader/0001-facetui-icon-glass.patch)
+hooks the one method every icon load funnels through and recomposes anything the
+pack does not curate — which is every app the user will ever install — onto the
+same glass. **This is what makes the coverage total.** Without it the pack is a
+list somebody has to keep extending; with it, the list is only an upgrade for
+apps worth hand-drawing.
+
+It builds a real `AdaptiveIconDrawable` rather than filtering the finished
+bitmap, so masking, shadows and monochrome extraction keep working on FacetUI
+icons exactly as they do on stock ones. For an app that already ships an
+adaptive icon, only its *foreground* is taken — keeping its background would put
+a coloured square inside the octagon; dropping it puts the app's own glyph on
+FacetUI's surface, which is the point.
+
+Details, including why the calendar and clock are deliberately excluded:
+[docs/icons.md](docs/icons.md).
 
 ## Keyboards and slabs, from one image
 
@@ -68,15 +108,17 @@ keyboard, and a bitmask that wraps negative in 64-bit shell arithmetic.
 |---|---|
 | [`bootanimation/`](bootanimation/) | The generator, and `facet_math.py` — FacetUI's AGSL transcribed to NumPy |
 | [`overlay/`](overlay/) | Four RRO overlays: SystemUI, framework, launcher, IME |
+| [`iconpack/`](iconpack/) | The icon generator, and the generated pack |
 | [`patches/`](patches/) | Source patches for what resources cannot express |
 | [`product/`](product/) | Product makefile, first-boot form-factor service |
-| [`tools/`](tools/) | Verifiers — boot animation, overlays, form-factor detection |
-| [`docs/`](docs/) | [status](docs/status.md) · [FacetUI](docs/facetui.md) · [building](docs/building.md) · [boot animation](docs/bootanimation.md) |
+| [`tools/`](tools/) | Verifiers — boot animation, overlays, icon pack, form-factor detection |
+| [`docs/`](docs/) | [status](docs/status.md) · [FacetUI](docs/facetui.md) · [icons](docs/icons.md) · [building](docs/building.md) · [boot animation](docs/bootanimation.md) · [keyboards and slabs](docs/keyboards-and-slabs.md) |
 
 ## Quick start
 
 ```bash
 bootanimation/build.sh        # builds and verifies; no Android SDK needed
+SKIP_APK=1 iconpack/build.sh  # generates and verifies the icons; no SDK needed
 
 tools/validate-overlays.py --systemui <frameworks/base> \
                            --launcher <Launcher3> --ime <LatinIME>
@@ -85,7 +127,7 @@ tools/test-formfactor-detect.sh
 
 Full instructions, both tiers: [docs/building.md](docs/building.md).
 
-## Three findings worth carrying forward
+## Four findings worth carrying forward
 
 **A looping boot animation part is resident for the whole boot.**
 `bootanimation` allocates a GL texture per frame for any part with `count != 1`
@@ -106,6 +148,12 @@ redundant; those were deleted rather than kept as decoration.
 app behind then shows through unmodified, which reads as a tinted window.
 Blurring what is behind is a window property, reachable only from code — so the
 glass keyboard is deliberately half overlay, half patch, and **needs both**.
+
+**One glass, never two.** The icon engine loads its tile *out of the pack*
+rather than generating its own, so a curated icon and a procedurally themed one
+are the same asset and cannot drift. It also makes the dependency explicit: with
+the pack absent the engine does nothing and icons stay stock, which is a
+deliberate degrade rather than a half-themed system.
 
 ## Credit
 

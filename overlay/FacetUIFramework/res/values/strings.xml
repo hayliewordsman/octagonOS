@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+         The shape every adaptive icon is clipped to.
+
+         AdaptiveIconDrawable parses this into the clip path it applies to all
+         of them, so changing it here changes every icon on the device at once
+         - system, preinstalled and user-installed alike - without touching a
+         single one of them individually.
+
+         This is a regular octagon: corner cut 100/(2+sqrt 2) = 29.289, which
+         makes all eight sides exactly 41.421 long. It is the octagonOS mark,
+         at the scale of an app icon.
+
+         Stock is a 100x100 rounded square with an 8-unit corner radius.
+
+         The path is on the 100x100 viewport AdaptiveIconDrawable expects, and
+         is closed. An octagon is also strictly larger than the circle Android
+         documents as the safe zone, so no icon that was drawn correctly for
+         the stock mask loses anything to this one.
+    -->
+    <string name="config_icon_mask" translatable="false">"M29.289,0 L70.711,0 L100,29.289 L100,70.711 L70.711,100 L29.289,100 L0,70.711 L0,29.289 Z"</string>
+</resources>

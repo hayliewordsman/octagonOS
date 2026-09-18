@@ -39,6 +39,17 @@ PRODUCT_PACKAGES += \
     FacetUILauncher \
     FacetUIIME
 
+# --- FacetUI icons ----------------------------------------------------------
+# The curated icon pack. Not an overlay: an RRO can only override resources a
+# target already defines and cannot add new ones, and every drawable in here is
+# new.
+#
+# The icon engine in patches/iconloader/0001 also loads its glass tile out of
+# this package, so with the pack absent every icon is left stock. It is a hard
+# dependency of the icon theming, not an optional extra.
+PRODUCT_PACKAGES += \
+    FacetUIIcons
+
 # --- boot animation ---------------------------------------------------------
 PRODUCT_COPY_FILES += \
     vendor/octagonos/bootanimation/out/bootanimation.zip:$(TARGET_COPY_OUT_SYSTEM)/media/bootanimation.zip

@@ -4,7 +4,7 @@ Two paths. Pick by how much of the glass you need and how much disk you have.
 
 | | Tier 2 | Tier 3 |
 |---|---|---|
-| What you get | Blur, tint, depth model, glass notifications and lockscreen, boot animation | All of that, plus the AGSL shaders and the glass keyboard |
+| What you get | Blur, tint, depth model, glass notifications and lockscreen, boot animation, octagonal icon mask, curated icon pack | All of that, plus the AGSL shaders, the glass keyboard, and FacetUI icons for **every** app |
 | Needs | A prebuilt Android 17 GSI, the Android SDK for `aapt2` | A full source tree |
 | Disk | A few GB | **250-400 GB** |
 | Time | Minutes | 1-4 hours for a first build |
@@ -38,7 +38,17 @@ overlay/build.sh
 
 # 3. Build and verify the boot animation. No SDK needed.
 bootanimation/build.sh
+
+# 4. Build and verify the icon pack. Generation needs no SDK; packaging does.
+iconpack/build.sh
 ```
+
+The icon pack is not optional if you want FacetUI icons. The engine in
+`patches/iconloader/0001` loads its glass tile out of that package, so without
+it installed every icon is left stock -- which is a deliberate degrade, not a
+bug. On the Tier 2 path the pack still works on its own for the apps it
+curates, and `config_icon_mask` still makes every adaptive icon octagonal;
+what needs the source build is the procedural theming of everything else.
 
 Then inject everything into the image. octagonOS does not ship its own
 injector: `tools/inject-ime.sh` in
@@ -58,6 +68,7 @@ titan2e-eos/tools/inject-ime.sh \
   --add-file overlay/out/FacetUIFramework.apk:product/overlay/FacetUIFramework.apk \
   --add-file overlay/out/FacetUILauncher.apk:product/overlay/FacetUILauncher.apk \
   --add-file overlay/out/FacetUIIME.apk:product/overlay/FacetUIIME.apk \
+  --add-file iconpack/out/FacetUIIcons.apk:product/app/FacetUIIcons/FacetUIIcons.apk \
   --add-file bootanimation/out/bootanimation.zip:system/media/bootanimation.zip \
   --add-file product/octagonos/bin/octagonos-formfactor.sh:system/bin/octagonos-formfactor.sh \
   --add-file product/octagonos/etc/init/octagonos-formfactor.rc:system/etc/init/octagonos-formfactor.rc \
@@ -118,13 +129,18 @@ cd packages/inputmethods/LatinIME
 git apply --check ~/octagonOS/patches/ime/0001-facetui-glass-keyboard-window.patch
 git apply         ~/octagonOS/patches/ime/0001-facetui-glass-keyboard-window.patch
 cd ../../..
+
+cd frameworks/libs/systemui
+git apply --check ~/octagonOS/patches/iconloader/0001-facetui-icon-glass.patch
+git apply         ~/octagonOS/patches/iconloader/0001-facetui-icon-glass.patch
+cd ../../..
 ```
 
 Apply the SystemUI patches in order; `0002` builds on `0001`.
 
-These were generated against `LineageOS/android_frameworks_base` and
-`android_packages_inputmethods_LatinIME` at `lineage-24.0`, and verified to
-apply to pristine checkouts of both. They should port across nearby branches,
+These were generated against `LineageOS/android_frameworks_base`,
+`android_packages_inputmethods_LatinIME` and `android_frameworks_libs_systemui`
+at `lineage-24.0`, and verified to apply to pristine checkouts of all three. They should port across nearby branches,
 but a tree carrying its own SystemUI changes may move the context lines --
 `ScrimView.onDraw` is the hunk most likely to drift.
 
@@ -192,9 +208,11 @@ adb shell getprop ro.surface_flinger.supports_background_blur \
                   ro.octagonos.version ro.octagonos.ui \
                   persist.octagonos.formfactor
 adb shell cmd overlay list | grep -i facetui
+adb shell pm list packages | grep facetui.icons
 ```
 
-All four overlays should be listed and enabled, and `persist.octagonos.formfactor`
+All four overlays should be listed and enabled, the icon pack should be
+installed, and `persist.octagonos.formfactor`
 should read `keyboard` or `slab` correctly for the phone in your hand.
 
 Then try connecting ADB from an unauthorised host. **If it attaches without

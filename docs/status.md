@@ -19,8 +19,11 @@ written in.
 | `desc.txt` format | Checked against that file's own parser, including that a `#RRGGBB` background is accepted for a `p`/`c` part and is what `glClearColor` receives |
 | SystemUI patches 0001-0003 | `git apply --check` passes in sequence against a pristine `LineageOS/android_frameworks_base` `lineage-24.0` checkout, then applies |
 | IME patch | `git apply --check` passes against a pristine `LineageOS/android_packages_inputmethods_LatinIME` `lineage-24.0` checkout, then applies |
+| Icon engine patch | `git apply --check` passes against a pristine `LineageOS/android_frameworks_libs_systemui` `lineage-24.0` checkout, then applies. Every Android API it calls checked to exist with the signature used -- `InsetDrawable(Drawable, float)`, `AdaptiveIconDrawable(Drawable, Drawable)`, `Resources.getDrawableForDensity`, and `XmlResourceParser` implementing `AutoCloseable` |
+| Icon pack | **Generated and verified.** `tools/verify-iconpack.py` passes: 68 resource files well-formed, 40 appfilter entries all resolving, 22 adaptive icons with every layer resolving, the tile present at 5 densities with a real alpha channel, worst glyph at 30.0 of a 33-unit safe radius, no orphans |
+| Octagon icon mask | The path is a true regular octagon, checked numerically: all eight sides 41.4214 |
 | Every symbol the patches introduce | Checked to be imported or declared, including `Icon.createWithResource(String, int)` being the public overload and not the one marked "Do not use", and `isAmbient`/`notifKey` existing on `ActiveNotificationIconModel` |
-| Overlay resources | `tools/validate-overlays.py` passes: all 28 overridden resources exist in their target trees, with the patch-provided ones exempted by name |
+| Overlay resources | `tools/validate-overlays.py` passes: every overridden resource exists in its target tree, with the patch-provided ones exempted by name |
 | Form-factor detection | `tools/test-formfactor-detect.sh` passes 7 cases, including a bitmask whose top bit is set and therefore wraps negative in 64-bit shell arithmetic |
 
 ## Not verified
@@ -31,12 +34,14 @@ written in.
 | The patches, compiled | They apply. They have never been built. Expect to fix something on the first compile |
 | The AGSL, compiled | The two shaders have never been handed to a shader compiler. This is the single likeliest thing to fail first |
 | The overlays, built | No Android SDK in this environment, so `aapt2` never ran. The sources validate; the APKs do not exist |
+| The icon pack, built | Same: the pack's `res/` is generated and verified, but it has never been packaged into an APK |
+| Whether icons actually look right on a device | The preview renders the adaptive icon's own group transform, so it should match -- but it is Pillow's rasteriser, not Android's. Thin strokes and the `evenOdd` fill are where the two are most likely to disagree |
 | Whether the overlays take effect | `android:isStatic` is deprecated, so an overlay in `/product/overlay` may need `cmd overlay enable`. The first-boot script does that, but the script has not run |
 | Whether blur renders acceptably | `ro.surface_flinger.supports_background_blur=1` makes SurfaceFlinger attempt blur. Whether it holds frame rate is a per-device measurement nobody has taken |
 | SELinux for the first-boot service | The service ships with no seclabel, deliberately. On an enforcing build it will not have the permissions it needs. Policy is owed |
 | The GSI itself | **No image has been built.** A GSI needs roughly 250-400 GB and many CPU-hours; see [building.md](building.md) |
 
-## The two things most likely to break first
+## The three things most likely to break first
 
 **The AGSL.** Everything else in the Tier 3 path is ordinary Java and Kotlin
 that a compiler will check. The shaders are strings, compiled at runtime by
@@ -45,6 +50,12 @@ frame, not as a build error. titan2e-eos ships `tools/shader-check/`, a ~20 MB
 Android app that compiles this AGSL without a 300 GB tree; that is the cheapest
 way to retire this risk and it applies unchanged here, because the shader bodies
 are unchanged.
+
+**The icon engine, on a device with many apps.** It runs inside the icon load
+path for every app on the system. The composition itself is cheap -- an
+`AdaptiveIconDrawable` around two existing drawables -- and the results are
+cached by the launcher's own icon cache, but nothing here has measured a cold
+app-drawer open with a few hundred apps installed.
 
 **The first-boot service.** It touches three things that SELinux guards, on a
 build where it has no policy of its own. The likeliest outcome on an enforcing
@@ -74,3 +85,8 @@ re-check:
 - [ ] Confirm the boot animation centres correctly on a near-square display,
       which is the case the square canvas exists for and the one no emulator
       profile covers by default
+- [ ] Look at the icons on a real launcher at real density. 48dp is much smaller
+      than any preview here, and legibility at that size is the whole question
+- [ ] Check the icon engine's cost on a cold app-drawer open. It composes an
+      adaptive icon per app, which should be cheap and cached, but "should be"
+      is not a measurement
