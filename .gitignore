@@ -9,3 +9,11 @@ mobile/iconpack/out/
 # The boot animation IS committed -- see mobile/bootanimation/out/. It is built
 # here, reproducibly, from committed sources, and an image needs it at inject
 # time whether or not the builder has Pillow.
+
+# Screenshots from the Plymouth harness. They are evidence for one run, not an
+# artifact: the theme itself is committed, and the harness regenerates these.
+desktop/tools/*.png
+desktop/tools/*.xwd
+
+# The Plymouth theme IS committed, like the boot animation: it is generated
+# reproducibly from committed sources, and CI rebuilds it and diffs.

@@ -9,7 +9,7 @@ imported by both, so the two cannot drift apart.
 | | | |
 |---|---|---|
 | [**`mobile/`**](mobile/) | An Android 17 GSI, for phones with physical keyboards and for slabs, from one image | **Beta. Verified, never run** |
-| [**`desktop/`**](desktop/) | An Ubuntu-based Linux distribution carrying the same design language | **Not started** |
+| [**`desktop/`**](desktop/) | An Ubuntu-based Linux distribution carrying the same design language | **Started. Boot splash built and run** |
 | [**`shared/`**](shared/) | The FacetUI core both editions import | — |
 
 ![The octagonOS boot animation](mobile/docs/preview/bootanimation-arc.png)
@@ -27,6 +27,13 @@ kept honest: nothing else in the repository claims more than it does.
 The single largest risk was retired late: **both AGSL shaders now compile**
 under Skia's own SkSL compiler, offline. That was the one failure that would
 have surfaced as a blank screen after a multi-hour build.
+
+On the desktop side one thing *has* run: the
+[Plymouth boot splash](desktop/plymouth/) was installed against a real
+`plymouthd`, driven with real keystrokes and screenshotted — including the
+encrypted-disk passphrase path, which is the part of a boot theme that ruins a
+machine when it is wrong. Four bugs came out of running it that reading the
+script had not found.
 
 ## Why this is one repository
 
@@ -47,7 +54,8 @@ patches.
 - [`shared/docs/design-language.md`](shared/docs/design-language.md) — the rule,
   the depth model, and the doctrine
 - [`mobile/README.md`](mobile/README.md) — the Android edition
-- [`desktop/README.md`](desktop/README.md) — what the Linux edition would be
+- [`desktop/README.md`](desktop/README.md) — the Linux edition, and the
+  KWin/Plasma-on-Wayland decision behind it
 
 ## Credit
 

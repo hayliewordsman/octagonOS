@@ -122,3 +122,40 @@ jobs:
           git -C ../ime apply --check "$GITHUB_WORKSPACE/mobile/patches/ime/0001-facetui-glass-keyboard-window.patch"
           clone android_frameworks_libs_systemui ../libs
           git -C ../libs apply --check "$GITHUB_WORKSPACE/mobile/patches/iconloader/0001-facetui-icon-glass.patch"
+
+  plymouth:
+    name: The boot splash, checked and run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install numpy pillow
+
+      # Rebuild rather than trusting what is committed, for the same reason as
+      # the boot animation: a generator change nobody re-ran is the drift this
+      # is for. The frame counts are prepended into the script by the
+      # generator, so a stale theme is a script that disagrees with its frames.
+      - run: desktop/plymouth/make-plymouth-theme.py
+      - name: the committed theme is what the generator produces
+        run: git diff --exit-code --stat desktop/plymouth/octagonos
+
+      - run: desktop/tools/verify-plymouth-theme.py
+
+      # The static checks read the script. This runs it. A Plymouth theme fails
+      # silently -- a callback that never fires draws nothing and logs nothing
+      # -- so the only way to know is to put it on a screen and look.
+      - name: Install what a real boot would install
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y plymouth plymouth-x11 plymouth-label \
+                                  xvfb xdotool netpbm x11-apps
+      - name: Run it, type at it, and check each state
+        run: |
+          set -eux
+          sudo desktop/plymouth/install.sh --no-initrd
+          sudo desktop/tools/run-plymouth-theme.sh ci \
+            "true" \
+            "plymouth ask-for-password --prompt='Unlock disk (ci_crypt)' &" \
+            KEYS:hunter2 ENTER
+          desktop/tools/check-plymouth-shots.py desktop/tools/ci
