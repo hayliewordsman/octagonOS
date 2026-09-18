@@ -13,8 +13,9 @@ icon and nothing anywhere says why:
   4. the glass tile exists at every density, is square, and has real
      transparency (a tile that came out fully opaque would show as a square
      behind every octagon)
-  5. every glyph stays inside the adaptive-icon safe zone once its group
-     transform is applied -- the check that catches artwork the mask will clip
+  5. every glyph stays inside BOTH bounds that constrain it, once its group
+     transform is applied: Android's mask safe zone, and -- the tighter one --
+     FacetUI's own calm centre, the table the glass tile leaves flat
   6. nothing in the pack is orphaned
 
 Exits non-zero on any failure. Needs Pillow; everything else is stdlib.
@@ -38,6 +39,44 @@ ANDROID = "{http://schemas.android.com/apk/res/android}"
 #: of diameter 66 centred in the 108-unit viewport.
 ADAPTIVE_SIZE = 108.0
 SAFE_DIAMETER = 66.0
+
+#: The eight edge normals of the octagon, for measuring a point against it.
+#: The table is an octagon, not a circle, so a plain radius over-reports in the
+#: vertex directions and would reject artwork that actually fits.
+OCTAGON_NORMALS = [(math.cos(k * math.pi / 4), math.sin(k * math.pi / 4))
+                   for k in range(8)]
+
+
+def load_generator(pack):
+    """Import the generator beside the pack, for its geometry and flattener.
+
+    The design's own numbers, not a second copy of them here: the table radius
+    and the glyph transform are what the tile is drawn from, so a duplicate set
+    in this file would be free to drift away from the thing being checked.
+
+    Returns None if it cannot be loaded, in which case the table check is
+    skipped and said to be skipped rather than quietly passing.
+    """
+    import importlib.util
+    gen = os.path.join(os.path.dirname(os.path.abspath(pack)), "make-icons.py")
+    if not os.path.exists(gen):
+        return None
+    try:
+        sys.path.insert(0, os.path.dirname(gen))
+        sys.path.insert(0, os.path.join(os.path.dirname(gen), "..", "bootanimation"))
+        spec = importlib.util.spec_from_file_location("_facetui_gen", gen)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except Exception as e:
+        print(f"  warn  could not load {gen}: {e}")
+        return None
+
+
+def octagon_distance(gx, gy):
+    """How far a point is out along the octagon, in 108-unit viewport space."""
+    dx, dy = gx - ADAPTIVE_SIZE / 2.0, gy - ADAPTIVE_SIZE / 2.0
+    return max(dx * nx + dy * ny for nx, ny in OCTAGON_NORMALS)
 
 #: Densities the tile must exist at.
 DENSITIES = ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]
@@ -220,11 +259,25 @@ def main():
         c.ok(f"present at all {len(DENSITIES)} densities, square, with "
              f"a real alpha channel")
 
-    # --- 5. glyphs inside the safe zone -------------------------------------
-    print("\nglyph safe zone")
+    # --- 5. glyphs inside both bounds ---------------------------------------
+    #
+    # Two bounds, and the tighter one is FacetUI's own. A glyph that fits
+    # Android's mask can still run off the flat table and across the facets,
+    # which is a design fault rather than a clipping one -- and invisible to a
+    # check that only knows about the mask.
+    print("\nglyph bounds")
     safe_r = SAFE_DIAMETER / 2.0
     centre = ADAPTIVE_SIZE / 2.0
-    worst = None
+
+    gen = load_generator(args.pack)
+    table_r = gen.table_radius() if gen else None
+    if gen is None:
+        c.warn("generator not found beside the pack; checking the mask safe "
+               "zone only, NOT the table")
+
+    worst_mask = None
+    worst_table = None
+    over_table = []
     checked = 0
     for p in sorted(xmls):
         if os.sep + "drawable" not in p or "facetui_tile" in p:
@@ -238,25 +291,53 @@ def main():
         scale = float(group.get(f"{ANDROID}scaleX", "1"))
         pivot = float(group.get(f"{ANDROID}pivotX", "0"))
         tx = float(group.get(f"{ANDROID}translateX", "0"))
+        name = os.path.basename(p)
 
+        glyph_mask = 0.0
+        glyph_table = 0.0
         for path in group.findall("path"):
             data = path.get(f"{ANDROID}pathData") or ""
-            for x, y in path_points(data):
+            # Flatten curves and arcs where possible. Reading anchor points
+            # alone under-reports a glyph whose widest part is mid-curve, which
+            # is exactly the artwork most likely to be the problem.
+            if gen is not None:
+                pts = [pt for sub in gen._subpaths(data) for pt in gen._flatten(sub)]
+            else:
+                pts = path_points(data)
+            for x, y in pts:
                 gx = (x - pivot) * scale + pivot + tx
                 gy = (y - pivot) * scale + pivot + tx
-                r = math.hypot(gx - centre, gy - centre)
-                if worst is None or r > worst[0]:
-                    worst = (r, os.path.basename(p))
+                glyph_mask = max(glyph_mask, math.hypot(gx - centre, gy - centre))
+                glyph_table = max(glyph_table, octagon_distance(gx, gy))
+
+        if worst_mask is None or glyph_mask > worst_mask[0]:
+            worst_mask = (glyph_mask, name)
+        if worst_table is None or glyph_table > worst_table[0]:
+            worst_table = (glyph_table, name)
+        if table_r is not None and glyph_table > table_r:
+            over_table.append((glyph_table, name))
         checked += 1
 
-    if worst is None:
+    if worst_mask is None:
         c.warn("no glyph vectors found to check")
-    elif worst[0] > safe_r:
-        c.fail(f"{worst[1]} reaches {worst[0]:.1f} from centre, outside the "
-               f"{safe_r:.0f}-unit safe zone -- the mask will clip it")
     else:
-        c.ok(f"{checked} glyphs, furthest point {worst[0]:.1f} of "
-             f"{safe_r:.0f} ({worst[1]})")
+        if worst_mask[0] > safe_r:
+            c.fail(f"{worst_mask[1]} reaches {worst_mask[0]:.1f} from centre, "
+                   f"outside the {safe_r:.0f}-unit mask safe zone -- it will "
+                   f"be clipped")
+        else:
+            c.ok(f"mask safe zone: {checked} glyphs, furthest "
+                 f"{worst_mask[0]:.1f} of {safe_r:.0f} ({worst_mask[1]})")
+
+        if table_r is not None:
+            if over_table:
+                for d, n in sorted(over_table, reverse=True):
+                    c.fail(f"{n} reaches {d:.1f} against a table edge of "
+                           f"{table_r:.1f} -- the glyph runs off the calm "
+                           f"centre and across the facets")
+            else:
+                c.ok(f"table: furthest {worst_table[0]:.1f} of {table_r:.1f} "
+                     f"({worst_table[1]})")
 
     # --- 6. orphans ---------------------------------------------------------
     print("\norphans")

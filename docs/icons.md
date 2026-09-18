@@ -88,15 +88,31 @@ soft at exactly the sizes a launcher asks for. So glyphs are vectors and the
 tile is a PNG at five densities. The tile is the pack's only raster and
 therefore the whole of its size cost — about 550 KB for the lot.
 
-## The calm centre
+## The calm centre, and fitting glyphs to it
 
-The tile's flat table is much larger than the boot animation's (`0.70` against
+The tile's flat table is much larger than the boot animation's (`0.84` against
 `0.46`). On the boot screen the facets are the subject. On an icon they are a
 bezel, and the subject is the glyph on top of them.
 
 Eight facets' worth of value variation running underneath a thin glyph at 48dp
 makes the glyph unreadable. So the crown is pushed out to a ring and the middle
 is left calm.
+
+**`TABLE_FRAC` and `GLYPH_SCALE` are a pair and cannot be set independently.**
+Together they decide whether a glyph sits on calm glass or straddles the girdle
+hairline. The first version of this pack got that wrong: the table edge sat at
+`25.2` and **fifteen of the twenty-five glyphs ran over it onto the facets** —
+the calm centre existed, but most glyphs were not inside it.
+
+The reason it survived a verification pass is worth recording. The check at the
+time measured glyphs against Android's *mask* safe zone, radius `33`, and every
+glyph cleared it — the worst at `32.4`. But the mask was never the binding
+constraint. The table is smaller than the mask, and nothing was measuring
+against it, so the check passed while the design was visibly broken.
+
+It is now `0.84` and `0.59`: the widest glyph reaches `27.9` against a table
+edge of `30.2` and a mask safe radius of `33`. Both bounds are checked on every
+build, and the table one is the one that bites.
 
 ## Drawing glyphs
 
@@ -123,15 +139,30 @@ and nothing says why:
 3. every adaptive icon's background, foreground and monochrome layers resolve
 4. the tile exists at every density, is square, and has real transparency — a
    tile that came out opaque would show as a square behind every octagon
-5. every glyph stays inside the safe zone once its group transform is applied
+5. every glyph stays inside **both** bounds that constrain it, once its group
+   transform is applied: Android's mask safe zone, and — the tighter one —
+   FacetUI's own table
 6. nothing in the pack is orphaned
 
-Check 5 is the one that earns its place. The glyphs are placed by a
-`scale`/`pivot`/`translate` group in each vector, and getting that transform
-wrong moves all 22 at once — the first build put the widest glyph at 31.7
-against a safe radius of 33, inside but with 4% to spare, which would not have
-survived a launcher using a slightly tighter mask. The global scale came down
-from `0.72` to `0.68` on the strength of that number.
+Check 5 is the one that earns its place, and it earns it twice.
+
+The glyphs are placed by a `scale`/`pivot`/`translate` group in each vector, so
+getting that transform wrong moves all 22 at once. The mask bound caught the
+first problem: the widest glyph at `31.7` against a safe radius of `33`, inside
+but with 4% to spare, which would not have survived a launcher using a tighter
+mask. The scale came down from `0.72` to `0.68` on that.
+
+The table bound caught the second, and larger, one — see above. It measures
+against the octagon rather than a circle, because the table *is* an octagon and
+a plain radius over-reports in the vertex directions, rejecting artwork that
+actually fits. It reads the table radius out of the generator rather than
+keeping its own copy, so the number being checked against is the number the
+tile was drawn from.
+
+Both were verified to fail on purpose before being trusted: regenerating the
+pack with the old constants makes the table check name all fifteen offending
+glyphs and exit non-zero, while the mask check still reports `32.4 of 33` and
+passes. That contrast is the whole argument for having the second bound.
 
 ## Status
 

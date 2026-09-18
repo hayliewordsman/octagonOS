@@ -68,7 +68,13 @@ EDGE_INTENSITY = 0.50
 #: the glyph sitting on top. Eight facets' worth of value variation running
 #: under a thin glyph at 48dp makes the glyph unreadable, so the crown is
 #: pushed out to a ring and the middle left calm.
-TABLE_FRAC = 0.70
+#:
+#: 0.84, not the 0.70 this started at. At 0.70 the table's edge sat at 25.2 and
+#: fifteen of the twenty-five glyphs ran straight over it onto the facets --
+#: the calm centre existed but most glyphs were not inside it. The table and
+#: GLYPH_SCALE below are a pair: they are what decides whether a glyph sits on
+#: calm glass or across a girdle hairline, and neither can be changed alone.
+TABLE_FRAC = 0.84
 
 #: Android's adaptive icon geometry. The drawable is 108 units square, the mask
 #: covers the middle 72, and the outer 18 on each side is parallax bleed that
@@ -83,11 +89,17 @@ MASK_SIZE = 72
 #: is a circle of diameter 66 in the 108 viewport -- smaller than the mask
 #: square in every direction that matters.
 #:
-#: 0.68 rather than the mask's own 0.72 because the widest glyph was landing at
-#: 31.7 against a safe radius of 33. Inside, but with 4% to spare, which is not
-#: enough to survive a launcher using a slightly tighter mask than the one this
-#: ships. tools/verify-iconpack.py reports the worst case on every build.
-GLYPH_SCALE = 0.68
+#: 0.59, arrived at twice over. First down from the mask's own 0.72 to 0.68,
+#: because the widest glyph was landing at 31.7 against Android's safe radius
+#: of 33 -- inside, but not by enough to survive a launcher with a tighter mask.
+#: Then down again to 0.59, because fitting the MASK was never the binding
+#: constraint: the glyph has to fit the TABLE, which is smaller, and measuring
+#: against the mask alone had hidden that for every glyph in the pack.
+#:
+#: At 0.59 the widest glyph reaches 27.9 against a table edge of 30.2 and a
+#: mask safe radius of 33. tools/verify-iconpack.py checks both bounds on every
+#: build; the table one is the one that bites.
+GLYPH_SCALE = 0.59
 GLYPH_PIVOT = 50.0
 GLYPH_TRANSLATE = (ADAPTIVE_SIZE - 100.0) / 2.0
 
@@ -95,6 +107,18 @@ GLYPH_TRANSLATE = (ADAPTIVE_SIZE - 100.0) / 2.0
 #: tile is the only raster in the pack, so this is the whole of its size cost.
 DENSITIES = {"mdpi": 1.0, "hdpi": 1.5, "xhdpi": 2.0, "xxhdpi": 3.0, "xxxhdpi": 4.0}
 BASE_TILE_PX = 108
+
+
+def table_radius():
+    """Octagon-distance of the table's edge, in 108-unit viewport space.
+
+    The boundary between the calm centre a glyph should sit on and the faceted
+    crown it should not. Exported because tools/verify-iconpack.py checks every
+    glyph against it, and a second copy of the arithmetic there would be free to
+    drift away from this one.
+    """
+    apothem = ADAPTIVE_SIZE * (MASK_SIZE / ADAPTIVE_SIZE) * 0.5
+    return apothem * TABLE_FRAC
 
 
 def facet_lighting(psi):

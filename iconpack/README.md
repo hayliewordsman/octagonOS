@@ -80,6 +80,16 @@ subpaths are XORed, not merged, because the fill is `evenOdd` — that is what
 makes a gear's centre hole work, and it is why the sun is a disc with separate
 rays rather than the obvious cloud of overlapping circles.
 
-`tools/verify-iconpack.py` reports the worst glyph's distance from centre
-against the safe zone on every build. Keep an eye on it: artwork that clears
-this pack's octagon can still be clipped by a launcher using a tighter mask.
+`tools/verify-iconpack.py` measures every glyph against **two** bounds on each
+build, and the second is the one that bites:
+
+- Android's **mask** safe zone, radius 33 — clears this and the launcher will
+  not clip it;
+- FacetUI's **table**, currently 30.2 — clears this and the glyph sits on calm
+  glass rather than straddling the girdle and running across the facets.
+
+A glyph can pass the first and fail the second, and an earlier version of this
+pack did exactly that for fifteen of its twenty-five glyphs. If you add artwork
+that trips the table bound, shrink the glyph rather than raising `TABLE_FRAC`:
+the crown ring is what makes the icon read as glass, and there is not much of it
+left to give away.
