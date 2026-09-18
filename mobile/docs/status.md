@@ -29,6 +29,7 @@ written in.
 | Style and drawable overrides | `validate-overlays.py` now covers both. All three new failure modes verified to fail on purpose: a dropped style item (named all 20), a changed parent, and a drawable absent from the target |
 | Every symbol the patches introduce | Checked to be imported or declared, including `Icon.createWithResource(String, int)` being the public overload and not the one marked "Do not use", and `isAmbient`/`notifKey` existing on `ActiveNotificationIconModel` |
 | Overlay resources | `tools/validate-overlays.py` passes: every overridden resource exists in its target tree, with the patch-provided ones exempted by name |
+| Overlays and icon pack, linked | **Built with `aapt2`, signed with `apksigner`, signatures verified.** Building found two real bugs a name check cannot see: framework attributes used unqualified, and a private framework parent style referenced without the `@*android:` form. Both would have failed for anyone who tried to build |
 | Form-factor detection | `tools/test-formfactor-detect.sh` passes 7 cases, including a bitmask whose top bit is set and therefore wraps negative in 64-bit shell arithmetic |
 | **The AGSL, compiled** | **Both shaders compile** under Skia's own SkSL compiler, via `tools/validate-shaders.py`. The compiler was first proven awake on five deliberately broken shaders -- undeclared variable, type mismatch, missing `main`, syntax error, wrong `main` signature -- all rejected, and a valid one accepted |
 | FacetUI constants, everywhere | The same tool checks that `facet_math.py` still matches the AGSL's own literals, and that the four parameter values agree across the shader defaults, `ScrimView` and both generators. Verified to fail on purpose by drifting one of each |
@@ -40,8 +41,8 @@ written in.
 | **Any of it, on hardware** | **Nothing here has been near a phone.** No device, no emulator |
 | The patches, compiled | They apply. They have never been built. Expect to fix something on the first compile |
 | The AGSL, on Android's own compiler | Skia has compiled both, but AGSL is Android's *binding* of Skia runtime effects and this is not the Skia in any given release. Strong evidence, not proof |
-| The overlays, built | No Android SDK in this environment, so `aapt2` never ran. The sources validate; the APKs do not exist |
-| The icon pack, built | Same: the pack's `res/` is generated and verified, but it has never been packaged into an APK |
+| ~~The overlays, built~~ | **All eight build and sign.** `aapt2` linked them against android-35 and `apksigner` verified each one |
+| ~~The icon pack, built~~ | **Builds and signs.** 240 KB |
 | Whether icons actually look right on a device | The preview renders the adaptive icon's own group transform, so it should match -- but it is Pillow's rasteriser, not Android's. Thin strokes and the `evenOdd` fill are where the two are most likely to disagree |
 | Whether the overlays take effect | Now declared in `/product/overlay/config/config.xml`, which `OverlayConfigParser` reads at boot — the attribute handling was read out of that parser rather than assumed. Still never run |
 | The cost of blur-behind on dialogs | `windowBlurBehindEnabled` blurs the entire screen behind every dialog. That is the most expensive thing FacetUI asks for, and on an unmeasured GPU it is the first candidate to turn off |

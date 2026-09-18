@@ -13,8 +13,39 @@ Tier 2 is genuinely most of the look, and Android 17 makes it more so than
 Android 16 did -- notifications and the lockscreen moved into resources this
 release. See [facetui.md](facetui.md).
 
-**Nothing below has been run.** No image has been built from this repository.
-See [status.md](status.md).
+**The overlays and the icon pack build.** All eight overlays and FacetUIIcons
+link and sign with `aapt2` and `apksigner`; the APKs are reproducible from the
+committed sources. **No image has been built**, and nothing has run on a
+device. See [status.md](status.md).
+
+### Getting the tools, if you have no SDK
+
+`aapt2` and `apksigner` come from the Android build-tools, which do not need
+Android Studio or an emulator:
+
+```bash
+curl -sSLo bt.zip https://dl.google.com/android/repository/build-tools_r34-linux.zip
+unzip -q bt.zip -d /opt/android-bt        # aapt2, apksigner land in android-14/
+
+curl -sSLo plat.zip https://dl.google.com/android/repository/platform-35_r02.zip
+unzip -q plat.zip -d /opt/android-platform
+
+export PATH=/opt/android-bt/android-14:$PATH
+export ANDROID_JAR=/opt/android-platform/android-35/android.jar
+```
+
+A self-signed key is enough for overlays on a trusted partition:
+
+```bash
+keytool -genkeypair -keystore octagonos.jks -storepass CHANGEME \
+    -keyalg RSA -keysize 2048 -validity 10000 -alias octagonos \
+    -dname "CN=octagonOS, O=octagonOS, C=US"
+```
+
+The platform jar does not have to match the target release. Android 17 is API
+37, but android-35 links these overlays correctly because everything they
+reference exists by API 35 -- and `aapt2` version-qualifies what needs it (see
+below).
 
 ## Tier 2 -- from a prebuilt GSI
 
@@ -39,8 +70,8 @@ tools/validate-overlays.py \
 #       https://github.com/LineageOS/android_packages_apps_Settings ~/src/Settings
 #   git -C ~/src/Settings sparse-checkout set res
 
-# 2. Build the overlays. Needs the Android SDK.
-export ANDROID_JAR=$ANDROID_HOME/platforms/android-37/android.jar
+# 2. Build the overlays. Needs aapt2 and apksigner.
+export ANDROID_JAR=$ANDROID_HOME/platforms/android-35/android.jar
 export KEYSTORE=~/octagonos.jks KEYSTORE_PASS=...
 overlay/build.sh
 
@@ -86,6 +117,39 @@ titan2e-eos/tools/inject-ime.sh \
   --set-prop ro.adb.secure=1 \
   --set-prop ro.debuggable=0
 ```
+
+### What building caught that a resource check could not
+
+Two bugs, both of which would have failed for anyone who tried to build:
+
+**Framework attributes must be namespace-qualified.** `<item
+name="windowBackgroundBlurRadius">` resolves against the *overlay's own*
+package, which has no such attr. It needs `android:`. Same for
+`?attr/colorBackground` in a drawable, which needs `?android:attr/`.
+
+**A private framework parent needs the star form.**
+`Theme.Material.BaseDialog` is not in `public-final.xml`, so
+`parent="Theme.Material.BaseDialog"` fails and even `@android:style/` is
+rejected -- it has to be `@*android:style/`.
+
+Neither is visible to a check that verifies resource *names* exist, which is
+all `validate-overlays.py` can do. Only a linker sees them. Build before you
+believe an overlay is correct.
+
+### One thing aapt2 does on its own, correctly
+
+The dialog style comes out split by API level:
+
+```
+resource style/Theme.Material.Dialog
+  ()    (style) size=1 parent=0x01030436     backgroundDimAmount only
+  (v31) (style) size=4 parent=0x01030436     plus the three blur attributes
+```
+
+The blur attributes are API 31+, so `aapt2` version-qualified them. On an older
+device only the dim applies; on 31 and up all four do. That is the right
+behaviour and it is worth knowing it happens, because the resource dump looks
+alarming if you are not expecting two variants.
 
 ### Three flags that are not optional
 

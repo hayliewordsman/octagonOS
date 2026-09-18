@@ -37,6 +37,9 @@ apksigner sign --ks "$KEYSTORE" \
       --ks-pass "pass:$KEYSTORE_PASS" --key-pass "pass:$KEYSTORE_PASS" \
       --out "$OUT/FacetUIIcons.apk" "$OUT/FacetUIIcons-unsigned.apk"
 echo "    -> $OUT/FacetUIIcons.apk"
+# The intermediates only confuse a listing, and apksigner correctly
+# reports an unsigned APK as not verifying, which reads like a failure.
+rm -f "$OUT/FacetUIIcons-unsigned.apk" "$OUT/FacetUIIcons-res.zip"
 
 cat <<'EOF'
 

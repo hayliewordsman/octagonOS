@@ -26,7 +26,7 @@
      Theme.Material.Dialog and Theme.Material.Light.Dialog are, in the platform,
      completely EMPTY:
 
-         <style name="Theme.Material.Dialog" parent="Theme.Material.BaseDialog"/>
+         <style name="Theme.Material.Dialog" parent="@*android:style/Theme.Material.BaseDialog"/>
 
      There is nothing in them to lose. Everything a dialog actually gets comes
      from BaseDialog above, which is untouched, and every dialog variant in the
@@ -36,35 +36,49 @@
 
      The parents are restated explicitly and must stay correct; the style
      override check in tools/validate-overlays.py enforces that.
+
+     Two things here are namespace-qualified in ways the framework's own copy
+     is not, and both are aapt2 errors if you forget:
+
+       The parent styles take @*android:style/. They are framework styles, so
+       an unqualified name resolves against THIS package, which has no such
+       style. The star is the private-reference form: Theme.Material.BaseDialog
+       is not in public-final.xml, so a plain @android: reference is rejected
+       too.
+
+       The four attributes take android:. Unqualified, aapt2 looks for an attr
+       of that name in this package and fails. They are all public, so no star.
+
+     None of this is visible to a resource-name check - only to a linker.
 -->
 <resources>
 
     <!-- Dark dialogs. -->
-    <style name="Theme.Material.Dialog" parent="Theme.Material.BaseDialog">
+    <style name="Theme.Material.Dialog" parent="@*android:style/Theme.Material.BaseDialog">
         <!-- L2: the dialog panel itself samples what is behind it. -->
-        <item name="windowBackgroundBlurRadius">24dp</item>
+        <item name="android:windowBackgroundBlurRadius">24dp</item>
 
         <!-- L4: and the whole screen behind the dialog goes to the deepest
              tier, so the dialog reads as a pane held above the app rather
              than a card pasted onto it. -->
-        <item name="windowBlurBehindEnabled">true</item>
-        <item name="windowBlurBehindRadius">64dp</item>
+        <item name="android:windowBlurBehindEnabled">true</item>
+        <item name="android:windowBlurBehindRadius">64dp</item>
 
         <!-- Stock is 0.6 (0.7 on some DeviceDefault themes). That much black
              over a blur is just black: the dim buries the effect the two
              radii above pay for. Lowered to the point where the blur is what
              separates the dialog from the app, and the dim only deepens it. -->
-        <item name="backgroundDimAmount">0.32</item>
+        <item name="android:backgroundDimAmount">0.32</item>
     </style>
 
     <!-- Light dialogs. Same reasoning throughout. -->
-    <style name="Theme.Material.Light.Dialog" parent="Theme.Material.Light.BaseDialog">
-        <item name="windowBackgroundBlurRadius">24dp</item>
-        <item name="windowBlurBehindEnabled">true</item>
-        <item name="windowBlurBehindRadius">64dp</item>
+    <style name="Theme.Material.Light.Dialog" parent="@*android:style/Theme.Material.Light.BaseDialog">
+        <item name="android:windowBackgroundBlurRadius">24dp</item>
+        <item name="android:windowBlurBehindEnabled">true</item>
+        <item name="android:windowBlurBehindRadius">64dp</item>
         <!-- Slightly higher than the dark theme: a light panel over blurred
              content needs more separation from it to stay legible. -->
-        <item name="backgroundDimAmount">0.36</item>
+        <item name="android:backgroundDimAmount">0.36</item>
     </style>
 
 </resources>

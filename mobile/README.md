@@ -26,10 +26,10 @@ including everything that has not, is in **[docs/status.md](docs/status.md)**.
 | Boot animation | **Built and verified.** 8.9 MiB, 92 frames, all checks pass |
 | SystemUI patches (3) | **Apply cleanly** to a pristine `lineage-24.0` tree. Never compiled |
 | Keyboard glass patch | **Applies cleanly** to a pristine LatinIME tree. Never compiled |
-| RRO overlays (4) | Sources **validate** against their target trees. Never built — no SDK here |
+| RRO overlays (8) | **Build and sign.** `aapt2` + `apksigner`, signatures verified |
 | Icon engine patch | **Applies cleanly** to a pristine icon-loader tree. Never compiled |
 | Popup glass patch | **Applies cleanly**, alone and alongside the SystemUI three. Never compiled |
-| Icon pack | **Generated and verified.** 22 icons, 40 components, all checks pass. Never packaged — no SDK here |
+| Icon pack | **Generated, verified, and built.** 22 icons, 40 components, 240 KB APK |
 | Form-factor detection | **7/7 tests pass**, against synthetic bitmasks |
 | Overlay enablement | **Declarative**, via a product `OverlayConfig`. No boot service, no SELinux policy |
 | The AGSL shaders | **Both compile** under Skia's SkSL compiler. Not yet Android's own |

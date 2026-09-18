@@ -38,6 +38,9 @@ for ov in FacetUISystemUI FacetUIFramework FacetUILauncher FacetUIIME \
       --ks-pass "pass:$KEYSTORE_PASS" --key-pass "pass:$KEYSTORE_PASS" \
       --out "$OUT/$ov.apk" "$OUT/$ov-unsigned.apk"
   echo "    -> $OUT/$ov.apk"
+  # The intermediates only confuse a listing, and apksigner correctly
+  # reports an unsigned APK as not verifying, which reads like a failure.
+  rm -f "$OUT/$ov-unsigned.apk" "$OUT/$ov-res.zip"
 done
 
 cat <<'EOF'

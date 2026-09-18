@@ -9,15 +9,15 @@
      every app icon.
 
      The inset, the shape and the corner radius are unchanged, and the fill
-     still resolves through ?attr/colorBackground so it picks up the translucent
+     still resolves through ?android:attr/colorBackground so it picks up the translucent
      floating colour from values/colors.xml rather than hardcoding one. FacetUI
      changes material, not shape.
 -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
     android:inset="16dp">
     <shape android:shape="rectangle">
-        <corners android:radius="?attr/dialogCornerRadius" />
-        <solid android:color="?attr/colorBackground" />
+        <corners android:radius="?android:attr/dialogCornerRadius" />
+        <solid android:color="?android:attr/colorBackground" />
         <stroke
             android:width="1dp"
             android:color="#2EFFFFFF" />

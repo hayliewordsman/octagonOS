@@ -1,10 +1,11 @@
 __pycache__/
 *.pyc
 
-# Built overlay APKs. The sources and the build script are the deliverable;
-# the APKs need an Android SDK and a signing key that do not belong in git.
-overlay/out/
+# Built APKs. The sources and the build scripts are the deliverable; the
+# binaries need a signing key that does not belong in git.
+mobile/overlay/out/
+mobile/iconpack/out/
 
-# The boot animation IS committed -- see bootanimation/out/bootanimation.zip.
-# It is built here, reproducibly, from committed sources, and an image needs it
-# at inject time whether or not the builder has Pillow.
+# The boot animation IS committed -- see mobile/bootanimation/out/. It is built
+# here, reproducibly, from committed sources, and an image needs it at inject
+# time whether or not the builder has Pillow.
