@@ -30,7 +30,32 @@
 
 set -euo pipefail
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
+# RUN FROM A SNAPSHOT OF THIS FILE.
+#
+# Bash does not read a script into memory. It reads it incrementally, by byte
+# offset, as it executes. Edit the file while it is running and the offsets
+# stop meaning what they meant: the interpreter resumes in the middle of a
+# token and dies with a syntax error at a line it had not reached and which is
+# not wrong. A build that takes an hour is exactly long enough for someone --
+# me, on 2026-09-18 -- to improve the script it is still executing.
+#
+# So re-exec from a copy. The copy is unlinked immediately: on Linux the open
+# file descriptor keeps the inode alive, so bash reads on happily from a file
+# with no name, which is the point. Nothing on disk can be edited any more.
+if [ -z "${OCTAGONOS_ISO_PINNED:-}" ]; then
+    _snapshot="$(mktemp "${TMPDIR:-/tmp}/build-iso.XXXXXXXX.sh")"
+    cat "$0" > "$_snapshot"
+    OCTAGONOS_ISO_PINNED="$_snapshot" \
+    OCTAGONOS_ISO_HERE="$(cd "$(dirname "$0")" && pwd)" \
+        exec bash "$_snapshot" "$@"
+fi
+
+# Unlink the snapshot BY NAME, never as "$0": if this variable ever arrived
+# from the environment rather than from the block above, "$0" is the real
+# script in the repository and deleting it would be the worst kind of tidy-up.
+if [ -f "$OCTAGONOS_ISO_PINNED" ]; then rm -f "$OCTAGONOS_ISO_PINNED"; fi
+
+HERE="${OCTAGONOS_ISO_HERE:-$(cd "$(dirname "$0")" && pwd)}"
 ROOT="$(cd "$HERE/../.." && pwd)"
 
 PROFILE=desktop
@@ -67,10 +92,12 @@ cleanup() {
     done
 }
 trap cleanup EXIT
-mount --bind /dev     "$CHROOT/dev"
-mount --bind /dev/pts "$CHROOT/dev/pts"
-mount -t proc  proc  "$CHROOT/proc"
-mount -t sysfs sysfs "$CHROOT/sys"
+# Guarded, so a run that died before its trap fired does not leave this one
+# stacking a second layer of mounts on top of the first.
+mountpoint -q "$CHROOT/dev"     || mount --bind /dev     "$CHROOT/dev"
+mountpoint -q "$CHROOT/dev/pts" || mount --bind /dev/pts "$CHROOT/dev/pts"
+mountpoint -q "$CHROOT/proc"    || mount -t proc  proc  "$CHROOT/proc"
+mountpoint -q "$CHROOT/sys"     || mount -t sysfs sysfs "$CHROOT/sys"
 
 install -d "$CHROOT/etc/apt/sources.list.d" "$CHROOT/etc/apt/preferences.d" \
            "$CHROOT/usr/share/keyrings"
@@ -131,7 +158,15 @@ if [ "$PROFILE" = desktop ]; then
     say "installing FacetUI"
     install -d "$CHROOT/tmp/debs"
     cp "$ROOT"/desktop/packaging/out/*.deb "$CHROOT/tmp/debs/"
-    in_chroot sh -c 'apt-get install -y --no-install-recommends /tmp/debs/*.deb'
+    # --reinstall, and it matters. The FacetUI packages carry a fixed version
+    # (0.1) while their contents change every time a generator is edited. On a
+    # reused chroot plain `apt-get install` compares versions, finds 0.1 already
+    # present, prints "already the newest version" and installs NOTHING -- so
+    # the image ships the previous build's theme while the log reads clean.
+    # That is the worst shape a bug can take here: a green build that proves
+    # the old artefact.
+    in_chroot sh -c \
+        'apt-get install -y --reinstall --no-install-recommends /tmp/debs/*.deb'
     rm -rf "$CHROOT/tmp/debs"
 
     # Autologin, so the image proves itself without anyone typing a password.
@@ -144,7 +179,13 @@ Session=plasmawayland
 [General]
 DisplayServer=wayland
 EOF
-    in_chroot useradd -m -s /bin/bash -G sudo octagon
+    # Idempotent, because the chroot is deliberately reused between runs and
+    # useradd on an existing user exits non-zero -- which under `set -e` ends
+    # the build an hour in, on the one path that was supposed to be the fast
+    # one. Every other step here is already re-runnable; this was the gap.
+    if ! in_chroot id -u octagon >/dev/null 2>&1; then
+        in_chroot useradd -m -s /bin/bash -G sudo octagon
+    fi
     in_chroot sh -c 'echo "octagon:octagon" | chpasswd'
 
     # The self-test. Inert unless octagonos.selftest is on the kernel command
@@ -156,9 +197,14 @@ EOF
     install -D -m 644 "$HERE/selftest/octagonos-selftest.service" \
         "$CHROOT/etc/systemd/system/octagonos-selftest.service"
     in_chroot systemctl enable octagonos-selftest.service
-    # busctl, kreadconfig6 and setpriv are what it reports with.
+    # busctl, kreadconfig6 and setpriv are what it reports with. kreadconfig6
+    # lives in kf6-kconfig -- there is no kf6-kconfig-bin, whatever the split
+    # in other frameworks would suggest. Plasma pulls kf6-kconfig in anyway,
+    # so naming it here changes nothing about the image; it states the
+    # dependency instead of inheriting it by luck, which is what keeps the
+    # self-test working if the desktop set is ever trimmed.
     in_chroot apt-get install -y --no-install-recommends \
-        kf6-kconfig-bin util-linux
+        kf6-kconfig util-linux
 fi
 
 say "cleaning up"
