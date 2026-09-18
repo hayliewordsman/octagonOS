@@ -12,7 +12,7 @@ Output is `bootanimation/out/bootanimation.zip`: 8.9 MiB, 92 frames, 3.8s at
 
 ## It is lit by the real shaders
 
-`bootanimation/facet_math.py` is a literal NumPy transcription of the AGSL in
+`shared/facetui/facet_math.py` is a literal NumPy transcription of the AGSL in
 `patches/systemui/0001` and `0002` -- the same expressions in the same order, so
 the two can be read side by side. The mark's edge highlight is
 `FacetEdgeShader`; the darkening across each facet is `FacetRimShader`; the

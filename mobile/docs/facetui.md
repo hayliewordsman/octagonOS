@@ -1,9 +1,12 @@
 # FacetUI on Android 17
 
-FacetUI is the glass design language octagonOS is built on. It originates in
-[titan2e-eos](https://github.com/hayliewordsman/titan2e-eos), where it was
-designed against Android 16. This document covers what it is, and what changed
-in bringing it to Android 17.
+How the design language is implemented on Android, and what changed in bringing
+it from Android 16.
+
+**The language itself — the rule, the depth model, the tint doctrine, why only
+windows can blur — is in
+[`../../shared/docs/design-language.md`](../../shared/docs/design-language.md).**
+This document assumes it.
 
 ## The rule that governs everything
 
@@ -18,7 +21,7 @@ the edge highlight adds brightness, the rim darkening scales it. That is not a
 coincidence, it is the rule doing its job.
 
 The boot animation obeys it too, and for a reason beyond consistency: it is
-rendered by `bootanimation/facet_math.py`, which is a literal transcription of
+rendered by `shared/facetui/facet_math.py`, which is a literal transcription of
 the same AGSL. The mark on the boot screen is lit by the arithmetic that lights
 the shade.
 
@@ -256,7 +259,7 @@ shader is accepted. Without that, "it compiles" would only mean the compiler
 never says no.
 
 It also checks the things that *claim* to mirror the AGSL and were, until now,
-on trust: that `bootanimation/facet_math.py` still uses the same falloff and
+on trust: that `shared/facetui/facet_math.py` still uses the same falloff and
 centre-bias constants the shader does, and that the four FacetUI parameters
 agree across the shader defaults, `ScrimView`, the boot animation and the icon
 pack. This repository says throughout that the boot screen, the shade and the

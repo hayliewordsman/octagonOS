@@ -27,8 +27,15 @@ import zipfile
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from facet_math import edge_highlight, rim_darkening  # noqa: E402
+# The FacetUI core is shared with the desktop edition, so it lives outside
+# this directory rather than beside the thing that happens to use it first.
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "..", "shared"))
+from facetui.facet_math import edge_highlight, rim_darkening  # noqa: E402
+from facetui.palette import (  # noqa: E402
+    ACCENT_A, ACCENT_B, FACETS, FACET_HALF_ANGLE, FACET_TILT, LIGHT_ELEVATION,
+    RIM_WIDTH, RIM_AMOUNT, EDGE_INTENSITY,
+)
 
 # --- Brand ------------------------------------------------------------------
 # No spaces in either name; they are single tokens everywhere they appear.
@@ -45,16 +52,7 @@ SUBMARK = "FacetUI"
 #: with a gradient is kept away from the canvas edge instead.
 BG_BASE = np.array([0.016, 0.021, 0.031])
 
-#: The two accents the facets grade between, giving the mark a spectral read.
-ACCENT_A = np.array([0.36, 0.72, 1.00])   # cool cyan-blue
-ACCENT_B = np.array([0.62, 0.50, 1.00])   # violet
 
-#: Facet geometry. A regular octagon with a flat top: edge normals lie on
-#: multiples of 45 degrees, vertices on the 22.5-degree offsets.
-FACETS = 8
-FACET_HALF_ANGLE = math.pi / FACETS          # 22.5 degrees
-FACET_TILT = math.radians(52.0)              # how far each facet leans outward
-LIGHT_ELEVATION = math.radians(58.0)
 
 #: Shading constants.
 AMBIENT = 0.21
@@ -72,10 +70,7 @@ TABLE_ALPHA = 0.74
 BLOOM_THRESHOLD = 0.62
 BLOOM_GAIN = 0.55
 
-#: FacetUI parameters, matching the SystemUI patch defaults where they map.
-RIM_WIDTH = 0.42        # fraction of the facet half-width
-RIM_AMOUNT = 0.35       # FACET_RIM_AMOUNT in ScrimView
-EDGE_INTENSITY = 0.50   # FACET_EDGE_MAX_INTENSITY in ScrimView
+#: FacetUI parameters come from shared/facetui/palette.py; see the import above.
 
 #: Fonts, in preference order. DejaVu ships with essentially every Linux
 #: distribution, so the last entries are the portable fallback.

@@ -56,14 +56,18 @@ PRODUCT_PACKAGES += \
 
 # --- boot animation ---------------------------------------------------------
 PRODUCT_COPY_FILES += \
-    vendor/octagonos/bootanimation/out/bootanimation.zip:$(TARGET_COPY_OUT_SYSTEM)/media/bootanimation.zip
+    vendor/octagonos/mobile/bootanimation/out/bootanimation.zip:$(TARGET_COPY_OUT_SYSTEM)/media/bootanimation.zip
 
-# --- form-factor setup ------------------------------------------------------
-# One GSI serves both physical-keyboard phones and slabs; which one it is gets
-# resolved on first boot. See product/octagonos/bin/octagonos-formfactor.sh.
+# --- overlay enablement -----------------------------------------------------
+# Enables the FacetUI overlays declaratively, before the first frame, with no
+# runtime command and therefore no SELinux policy. This replaced a first-boot
+# service that called `cmd overlay enable`; see the note at the top of
+# mobile/tools/octagonos-formfactor.sh for why that service no longer exists.
+#
+# It also settles whether the overlays come up enabled at all, which
+# `android:isStatic` being deprecated had left unverified.
 PRODUCT_COPY_FILES += \
-    vendor/octagonos/product/octagonos/bin/octagonos-formfactor.sh:$(TARGET_COPY_OUT_SYSTEM)/bin/octagonos-formfactor.sh \
-    vendor/octagonos/product/octagonos/etc/init/octagonos-formfactor.rc:$(TARGET_COPY_OUT_SYSTEM)/etc/init/octagonos-formfactor.rc
+    vendor/octagonos/mobile/product/octagonos/overlay/config/config.xml:$(TARGET_COPY_OUT_PRODUCT)/overlay/config/config.xml
 
 # --- hardening --------------------------------------------------------------
 # GSIs commonly ship ro.adb.secure=0, which disables ADB authorisation

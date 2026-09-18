@@ -79,8 +79,7 @@ titan2e-eos/tools/inject-ime.sh \
   --add-file overlay/out/FacetUISettings.apk:product/overlay/FacetUISettings.apk \
   --add-file iconpack/out/FacetUIIcons.apk:product/app/FacetUIIcons/FacetUIIcons.apk \
   --add-file bootanimation/out/bootanimation.zip:system/media/bootanimation.zip \
-  --add-file product/octagonos/bin/octagonos-formfactor.sh:system/bin/octagonos-formfactor.sh \
-  --add-file product/octagonos/etc/init/octagonos-formfactor.rc:system/etc/init/octagonos-formfactor.rc \
+  --add-file product/octagonos/overlay/config/config.xml:product/overlay/config/config.xml \
   --set-prop ro.surface_flinger.supports_background_blur=1 \
   --set-prop ro.octagonos.version=1.0-beta \
   --set-prop ro.octagonos.ui=FacetUI \
@@ -215,14 +214,19 @@ Cheapest first:
 ```bash
 adb shell getprop ro.surface_flinger.supports_background_blur \
                   ro.octagonos.version ro.octagonos.ui \
-                  persist.octagonos.formfactor
+
 adb shell cmd overlay list | grep -i facetui
 adb shell pm list packages | grep facetui.icons
+
+# or all of it at once
+adb push tools/octagonos-formfactor.sh /data/local/tmp/
+adb shell sh /data/local/tmp/octagonos-formfactor.sh
 ```
 
-All four overlays should be listed and enabled, the icon pack should be
-installed, and `persist.octagonos.formfactor`
-should read `keyboard` or `slab` correctly for the phone in your hand.
+The overlays are enabled by `/product/overlay/config/config.xml`, which must be
+injected alongside them — without it they install and stay off.
+
+All eight overlays should be listed and enabled, and the icon pack installed.
 
 Then try connecting ADB from an unauthorised host. **If it attaches without
 prompting, the hardening did not take effect** and the exposure is still open.

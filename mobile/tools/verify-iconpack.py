@@ -63,7 +63,7 @@ def load_generator(pack):
         return None
     try:
         sys.path.insert(0, os.path.dirname(gen))
-        sys.path.insert(0, os.path.join(os.path.dirname(gen), "..", "bootanimation"))
+        sys.path.insert(0, os.path.join(os.path.dirname(gen), "..", "..", "shared"))
         spec = importlib.util.spec_from_file_location("_facetui_gen", gen)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)

@@ -65,7 +65,7 @@ that looks fine for a day and then is quietly wrong forever.
 ## The tile is loaded, not generated twice
 
 The glass octagon is rendered by `iconpack/make-icons.py` from
-`bootanimation/facet_math.py` — FacetUI's AGSL, transcribed. The engine then
+`shared/facetui/facet_math.py` — FacetUI's AGSL, transcribed. The engine then
 loads that rendered tile *out of the pack* rather than generating its own.
 
 So a curated icon and a procedurally themed one are the same asset. There is no

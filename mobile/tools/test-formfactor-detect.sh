@@ -5,11 +5,14 @@
 #     tools/test-formfactor-detect.sh
 #
 # The detection reads a KEY capability bitmask out of /proc/bus/input/devices
-# and decides whether a device is a real alphabetic keyboard. Getting that wrong
-# in either direction is bad and silent: a slab misdetected as a keyboard phone
-# gets the wrong default IME, and a keyboard phone misdetected as a slab types
-# into the wrong input method on first boot. So the bit arithmetic is tested
-# here rather than on the first device that boots it.
+# and decides whether a device is a real alphabetic keyboard. The bit
+# arithmetic is fiddly enough to be worth testing rather than trusting: it
+# reads the last of several hex groups, and that group routinely has its top
+# bit set, which wraps negative in 64-bit shell arithmetic.
+#
+# It no longer decides anything at boot - see the note at the top of
+# octagonos-formfactor.sh - but it is what a support report says about a device,
+# and a wrong answer there sends someone looking in the wrong place.
 #
 # The fixtures are SYNTHETIC. The bitmasks are constructed from the Linux input
 # event codes (uapi/linux/input-event-codes.h) rather than captured from
@@ -19,7 +22,7 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET="$SCRIPT_DIR/../product/octagonos/bin/octagonos-formfactor.sh"
+TARGET="$SCRIPT_DIR/octagonos-formfactor.sh"
 
 pass=0
 fail=0

@@ -38,7 +38,11 @@ import pathlib
 import re
 import sys
 
+#: mobile/, which is where the patches live.
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+#: shared/, which is where the maths and the palette live. The FacetUI core is
+#: shared with the desktop edition, so it sits outside this platform's tree.
+SHARED = ROOT.parent / "shared" / "facetui"
 
 #: The AGSL lives in the patches, since that is the only copy that ships.
 SHADERS = {
@@ -169,15 +173,15 @@ def main():
             c.ok(f"{name}: compiles ({len(src)} chars of AGSL)")
 
     # --- 3a. the NumPy transcription ---------------------------------------
-    # bootanimation/facet_math.py names two constants that appear as bare
+    # shared/facetui/facet_math.py names two constants that appear as bare
     # literals inside the AGSL. The generators render from that file, so if the
     # two drift, the boot screen and the icons stop being lit by the maths the
     # shade is lit by -- which this repository claims throughout.
     print("\nfacet_math.py against the AGSL")
-    fm = (ROOT / "bootanimation" / "facet_math.py")
+    fm = SHARED / "facet_math.py"
     edge = sources.get("FacetEdgeShader")
     if not fm.exists():
-        c.fail("bootanimation/facet_math.py is missing")
+        c.fail("shared/facetui/facet_math.py is missing")
     elif edge is None:
         c.warn("edge shader unavailable; cannot compare")
     else:
@@ -203,8 +207,11 @@ def main():
                 c.ok(f"{label}: {a} in both")
 
     # --- 3b. the parameter values, everywhere they are written --------------
-    # The same four numbers appear in the shader defaults, in ScrimView, and in
-    # both generators. Nothing makes them agree; this notices when they stop.
+    # Fewer copies than there used to be. The two generators shared their
+    # constants into shared/facetui/palette.py, so one definition serves both
+    # and cannot drift from itself. What remains are the Kotlin and Java copies
+    # inside the patches, which genuinely cannot import a Python file, so those
+    # are still compared against the shared one.
     print("\nFacetUI parameters, across every copy")
     sites = {
         "rim amount": [
@@ -212,9 +219,7 @@ def main():
              r"var amount: Float = ([0-9.]+)f"),
             ("ScrimView", SHADERS["FacetRimShader"],
              r"FACETUI_RIM_AMOUNT = ([0-9.]+)f"),
-            ("boot animation", "bootanimation/make-bootanimation.py",
-             r"^RIM_AMOUNT = ([0-9.]+)"),
-            ("icon pack", "iconpack/make-icons.py",
+            ("shared palette", "../shared/facetui/palette.py",
              r"^RIM_AMOUNT = ([0-9.]+)"),
         ],
         "edge intensity": [
@@ -222,9 +227,7 @@ def main():
              r"var intensity: Float = ([0-9.]+)f"),
             ("ScrimView", SHADERS["FacetEdgeShader"],
              r"FACETUI_EDGE_MAX_INTENSITY = ([0-9.]+)f"),
-            ("boot animation", "bootanimation/make-bootanimation.py",
-             r"^EDGE_INTENSITY = ([0-9.]+)"),
-            ("icon pack", "iconpack/make-icons.py",
+            ("shared palette", "../shared/facetui/palette.py",
              r"^EDGE_INTENSITY = ([0-9.]+)"),
         ],
         "rim width (dp)": [

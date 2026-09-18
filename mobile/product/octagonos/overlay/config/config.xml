@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Which FacetUI overlays are on, and whether the user may turn them off.
+
+     Installed to /product/overlay/config/config.xml. OverlayConfigParser reads
+     it at boot, so the overlays are enabled before the first frame is drawn
+     with no runtime command, no boot service and no SELinux policy.
+
+     This replaces a first-boot shell script that called `cmd overlay enable`
+     on each package. That script needed a domain of its own, permission to set
+     properties, and binder access to system_server - none of which a Tier 2
+     image can grant, because SELinux policy is compiled into the image and
+     cannot be injected into a prebuilt one. Doing it declaratively removes the
+     requirement instead of satisfying it.
+
+     It also retires a separate doubt: `android:isStatic` is deprecated, so
+     whether an overlay in /product/overlay came up enabled was previously
+     unverified. This states it.
+
+     mutable="true" so the overlays can still be turned off on a running device
+     for comparison or debugging:
+
+         adb shell cmd overlay disable dev.octagonos.facetui.systemui
+
+     ORDERING MATTERS. OverlayConfigParser throws IllegalStateException if an
+     immutable overlay appears after a mutable one. Everything here is mutable,
+     so the constraint is not currently live - but anything added with
+     mutable="false" must go above these lines, not below.
+-->
+<config>
+    <!-- The system surfaces: shade, notifications, lockscreen, quick settings. -->
+    <overlay package="dev.octagonos.facetui.systemui" enabled="true" mutable="true" />
+
+    <!-- The framework: SurfaceFlinger blur quality, the octagonal icon mask,
+         glass dialogs, popup and menu panels. -->
+    <overlay package="dev.octagonos.facetui.framework" enabled="true" mutable="true" />
+
+    <!-- Homescreen. -->
+    <overlay package="dev.octagonos.facetui.launcher" enabled="true" mutable="true" />
+
+    <!-- Virtual keyboard. Enabled on both form factors: a physical-keyboard
+         phone still shows the IME when its keyboard is closed. -->
+    <overlay package="dev.octagonos.facetui.ime" enabled="true" mutable="true" />
+
+    <!-- Apps whose surfaces are hardcoded and follow nothing. See
+         docs/app-coverage.md for why the others need no overlay at all. -->
+    <overlay package="dev.octagonos.facetui.settings" enabled="true" mutable="true" />
+    <overlay package="dev.octagonos.facetui.documentsui" enabled="true" mutable="true" />
+    <overlay package="dev.octagonos.facetui.etar" enabled="true" mutable="true" />
+    <overlay package="dev.octagonos.facetui.deskclock" enabled="true" mutable="true" />
+</config>

@@ -43,10 +43,10 @@ written in.
 | The overlays, built | No Android SDK in this environment, so `aapt2` never ran. The sources validate; the APKs do not exist |
 | The icon pack, built | Same: the pack's `res/` is generated and verified, but it has never been packaged into an APK |
 | Whether icons actually look right on a device | The preview renders the adaptive icon's own group transform, so it should match -- but it is Pillow's rasteriser, not Android's. Thin strokes and the `evenOdd` fill are where the two are most likely to disagree |
-| Whether the overlays take effect | `android:isStatic` is deprecated, so an overlay in `/product/overlay` may need `cmd overlay enable`. The first-boot script does that, but the script has not run |
+| Whether the overlays take effect | Now declared in `/product/overlay/config/config.xml`, which `OverlayConfigParser` reads at boot — the attribute handling was read out of that parser rather than assumed. Still never run |
 | The cost of blur-behind on dialogs | `windowBlurBehindEnabled` blurs the entire screen behind every dialog. That is the most expensive thing FacetUI asks for, and on an unmeasured GPU it is the first candidate to turn off |
 | Whether blur renders acceptably | `ro.surface_flinger.supports_background_blur=1` makes SurfaceFlinger attempt blur. Whether it holds frame rate is a per-device measurement nobody has taken |
-| SELinux for the first-boot service | The service ships with no seclabel, deliberately. On an enforcing build it will not have the permissions it needs. Policy is owed |
+| ~~SELinux for the first-boot service~~ | **Resolved by deletion.** The service needed privilege a Tier 2 image cannot grant. Overlay enablement is now declarative, the IME default belongs to the injection tool, and nothing read the property, so the service had no remaining job |
 | The GSI itself | **No image has been built.** A GSI needs roughly 250-400 GB and many CPU-hours; see [building.md](building.md) |
 
 ## The things most likely to break first
@@ -67,11 +67,6 @@ path for every app on the system. The composition itself is cheap -- an
 cached by the launcher's own icon cache, but nothing here has measured a cold
 app-drawer open with a few hundred apps installed.
 
-**The first-boot service.** It touches three things that SELinux guards, on a
-build where it has no policy of its own. The likeliest outcome on an enforcing
-image is that it runs, is denied, and the overlays are never enabled -- with the
-only symptom being that the system looks entirely stock.
-
 ## Where the risk is not
 
 Worth saying, because it is where the effort went and it is now cheap to
@@ -91,7 +86,8 @@ re-check:
 - [x] Compile the AGSL. Both shaders pass Skia's SkSL compiler
 - [ ] Run titan2e-eos's on-device harness to confirm against Android's own AGSL
       compiler, which is the only thing that settles it
-- [ ] Write an SELinux domain for `octagonos-formfactor`
+- [x] SELinux domain for `octagonos-formfactor` — not written; the service it
+      was for no longer exists
 - [ ] Build the overlays and confirm `cmd overlay list` shows all four
 - [ ] Measure blur cost on a real GPU before recommending `config_sf_slowBlur=false`
 - [ ] Confirm the boot animation centres correctly on a near-square display,

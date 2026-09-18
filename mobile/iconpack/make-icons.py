@@ -33,22 +33,15 @@ import numpy as np
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
-sys.path.insert(0, os.path.join(HERE, "..", "bootanimation"))
+sys.path.insert(0, os.path.join(HERE, "..", "..", "shared"))
 
-from facet_math import edge_highlight, rim_darkening  # noqa: E402
-from glyphs import APPS, GLYPHS, FALLBACK_GLYPH  # noqa: E402
+from facetui.facet_math import edge_highlight, rim_darkening  # noqa: E402
+from facetui.glyphs import APPS, GLYPHS, FALLBACK_GLYPH  # noqa: E402
+from facetui.palette import (  # noqa: E402
+    ACCENT_A, ACCENT_B, FACETS, FACET_HALF_ANGLE, FACET_TILT, LIGHT_ELEVATION,
+    RIM_WIDTH, RIM_AMOUNT, EDGE_INTENSITY,
+)
 
-# --- brand ------------------------------------------------------------------
-# Identical to bootanimation/make-bootanimation.py. If these drift, the boot
-# screen and the app drawer stop being the same material.
-ACCENT_A = np.array([0.36, 0.72, 1.00])   # cool cyan-blue
-ACCENT_B = np.array([0.62, 0.50, 1.00])   # violet
-
-FACETS = 8
-FACET_HALF_ANGLE = math.pi / FACETS
-FACET_TILT = math.radians(52.0)
-LIGHT_ELEVATION = math.radians(58.0)
 
 #: Where the light sits on an icon. Fixed, not animated: every icon on the
 #: screen is lit from the same direction, which is what makes a grid of them
@@ -59,9 +52,6 @@ AMBIENT = 0.30
 SPECULAR_POWER = 36.0
 SPECULAR_STRENGTH = 0.85
 
-RIM_WIDTH = 0.42
-RIM_AMOUNT = 0.35
-EDGE_INTENSITY = 0.50
 
 #: The flat table is much larger here than on the boot animation's mark (0.46).
 #: There the facets are the subject; here they are a bezel, and the subject is
