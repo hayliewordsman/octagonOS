@@ -81,6 +81,74 @@ Moving the other way:
   icon with a plain circle, *which* notification backs the dot is not observable.
   Only whether it keeps changing is, and sorting fixes that.
 
+## Dialogs are glass. Menus are not, and cannot be from a resource.
+
+The platform has carried three window attributes since Android 12:
+
+| Attribute | Effect |
+|---|---|
+| `windowBackgroundBlurRadius` | blurs what is behind the window, within its background |
+| `windowBlurBehindEnabled` | turns on blur of the whole screen behind the window |
+| `windowBlurBehindRadius` | how much |
+
+**No platform theme sets any of them.** They are sitting unused, and
+`PhoneWindow.generateLayout()` reads all three straight off the window's theme:
+
+```java
+if (a.getBoolean(R.styleable.Window_windowBlurBehindEnabled, false)) {
+    params.flags |= WindowManager.LayoutParams.FLAG_BLUR_BEHIND;
+    params.setBlurBehindRadius(a.getDimensionPixelSize(
+            android.R.styleable.Window_windowBlurBehindRadius, 0));
+}
+setBackgroundBlurRadius(a.getDimensionPixelSize(
+        R.styleable.Window_windowBackgroundBlurRadius, 0));
+```
+
+`Dialog` builds a `PhoneWindow`, so an overlay can make **every dialog in the
+system** glass with no code at all.
+
+### Two empty styles carry it
+
+Overriding a style in an RRO is risky, because the overlay's bag replaces the
+target's — anything the original declared and the override forgets is gone.
+Which makes it fortunate that in the platform these two are *empty*:
+
+```xml
+<style name="Theme.Material.Dialog" parent="Theme.Material.BaseDialog"/>
+<style name="Theme.Material.Light.Dialog" parent="Theme.Material.Light.BaseDialog"/>
+```
+
+There is nothing in them to lose. Everything a dialog actually gets comes from
+`BaseDialog` above, which is left alone, and every dialog variant in the system
+inherits down through these two — `Alert`, `MinWidth`, `NoActionBar`, the
+`DeviceDefault` counterparts, all of it. Largest possible reach, smallest
+possible risk.
+
+### Three things had to be true together
+
+- **blur**, from the attributes above;
+- **translucency**, because the blur renders *behind* the window background and
+  an opaque background hides it completely. That is the dialog-specific
+  `background_floating_device_default_*` pair, not `colorBackground`, which
+  would have made every activity window translucent;
+- **less dim.** Stock is `0.6`, and `0.7` on some DeviceDefault themes. That
+  much black over a blur is just black. Dropped to `0.32`, so the blur is what
+  separates the dialog from the app and the dim only deepens it.
+
+Miss any one and the other two are wasted — the same shape as the keyboard.
+
+### Menus are the honest limit
+
+A `PopupWindow` is **not** a `PhoneWindow`. It attaches a view straight to the
+`WindowManager`, never runs `generateLayout()`, and exposes no blur API of its
+own — checked, there is none in the class. So overflow menus, spinner dropdowns
+and autocomplete lists get **tint and a hairline only**, which by the rule at
+the top of this page is a tinted window, not glass.
+
+That is the ceiling for a resource-only change. Making menus genuinely glass
+needs a small framework patch setting a blur radius on the popup's own window.
+Not done here, and named rather than glossed.
+
 ## The three layers
 
 **Tier 1 -- properties.** `ro.surface_flinger.supports_background_blur=1`.

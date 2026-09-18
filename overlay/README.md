@@ -5,7 +5,7 @@ Resource-only changes. No recompile, so these work against a prebuilt GSI.
 | Overlay | Target package | Reaches |
 |---|---|---|
 | `FacetUISystemUI` | `com.android.systemui` | Shade, notifications, lockscreen, volume, power menu, bottom sheets |
-| `FacetUIFramework` | `android` | SurfaceFlinger blur quality |
+| `FacetUIFramework` | `android` | SurfaceFlinger blur quality, the octagonal icon mask, **glass dialogs**, popup and menu panels |
 | `FacetUILauncher` | `com.android.launcher3` | Homescreen folders, popups, organizer |
 | `FacetUIIME` | `com.android.inputmethod.latin` | Virtual keyboard translucency |
 
@@ -31,6 +31,23 @@ export ANDROID_JAR=$ANDROID_HOME/platforms/android-37/android.jar
 export KEYSTORE=~/octagonos.jks KEYSTORE_PASS=...
 ./build.sh
 ```
+
+## Overriding a style is not like overriding a value
+
+An RRO replaces a style **wholesale**: the overlay's bag of attributes replaces
+the target's rather than merging into it, so anything the original declared and
+the override forgets is gone at runtime, with the app rendering subtly wrong and
+nothing in the log.
+
+That is why the dialog glass goes in at `Theme.Material.Dialog` and
+`Theme.Material.Light.Dialog` — in the platform both are *empty*, so there is
+nothing to lose, and every dialog variant in the system still inherits through
+them.
+
+`validate-overlays.py` enforces it anyway: every overridden style must keep its
+parent and restate every item stock declares. Restating is correct whether a
+given Android version merges or replaces, so the check does not depend on
+winning that argument.
 
 ## Two things to know
 

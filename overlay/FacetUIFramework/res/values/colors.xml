@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     FacetUI: the dialog surface.
+
+     The blur in styles.xml renders BEHIND the window's background, so an opaque
+     background hides it completely. Translucency here is not decoration; it is
+     what makes the blur visible at all. Exactly the same pairing as the
+     keyboard: translucent alone is a tinted window, blurred alone is invisible,
+     and only both together are glass.
+
+     These two colours are dialog-specific - DeviceDefault themes route them to
+     colorBackgroundFloating, and Theme.Material.BaseDialog maps a dialog's
+     colorBackground onto that. Ordinary activity windows use
+     background_device_default_* instead and are left alone, which is the
+     reason for going at the floating pair rather than at colorBackground.
+-->
+<resources>
+    <!-- Stock: @color/background_device_default_dark, fully opaque.
+         0xC4 = 77%. Open enough that the blurred content reads as depth,
+         solid enough to carry dialog text at the contrast it was designed
+         for. -->
+    <color name="background_floating_device_default_dark">#C41A1D24</color>
+
+    <!-- Stock: @color/background_device_default_light, fully opaque.
+         Higher alpha than the dark theme: light-on-blur loses legibility
+         faster than dark-on-blur. -->
+    <color name="background_floating_device_default_light">#D6F7F9FD</color>
+</resources>

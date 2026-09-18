@@ -47,6 +47,8 @@ unrelated resource names.
 | **Homescreen** | Folder, popup and organizer blur, retuned to match the shade | overlay |
 | **Virtual keyboard** | Translucent background **and** a blurred window | overlay **+** patch |
 | Volume, power menu, bottom sheets | Pulled onto one depth tier | overlay |
+| **Dialogs, system-wide** | Real blur, translucency and reduced dim, from two empty styles | overlay |
+| **Popup and overflow menus** | Tint and hairline — blur needs a patch, see below | overlay |
 | Shade edge and rim | Two AGSL shaders | patch |
 | Status bar icons | Four modes, incl. a neutral privacy dot | patch |
 | **App icons — all of them** | Octagonal mask, a curated pack, and a procedural wrap for everything else | overlay **+** pack **+** patch |
@@ -127,7 +129,7 @@ tools/test-formfactor-detect.sh
 
 Full instructions, both tiers: [docs/building.md](docs/building.md).
 
-## Four findings worth carrying forward
+## Five findings worth carrying forward
 
 **A looping boot animation part is resident for the whole boot.**
 `bootanimation` allocates a GL texture per frame for any part with `count != 1`
@@ -148,6 +150,16 @@ redundant; those were deleted rather than kept as decoration.
 app behind then shows through unmodified, which reads as a tinted window.
 Blurring what is behind is a window property, reachable only from code — so the
 glass keyboard is deliberately half overlay, half patch, and **needs both**.
+
+**Three unused attributes were already there.** `windowBackgroundBlurRadius`,
+`windowBlurBehindEnabled` and `windowBlurBehindRadius` have existed since
+Android 12, are read straight off a window's theme by
+`PhoneWindow.generateLayout()`, and **no platform theme sets any of them**. Two
+*empty* platform styles — `Theme.Material.Dialog` and its Light twin — carry
+them down to every dialog variant in the system, so every dialog becomes real
+glass with no code. A `PopupWindow` is not a `PhoneWindow` and has no blur API
+at all, so menus get tint and a hairline and no more; that limit is named in
+[docs/facetui.md](docs/facetui.md) rather than glossed.
 
 **One glass, never two.** The icon engine loads its tile *out of the pack*
 rather than generating its own, so a curated icon and a procedurally themed one

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     FacetUI: the dialog panel.
+
+     A faithful copy of the platform drawable with one addition - the hairline.
+     Blur and tint alone read as translucent grey; a 1dp stroke at the panel
+     edge catches light and gives the surface a boundary, and that is what makes
+     it read as glass. The same stroke runs around the shade, the keyboard and
+     every app icon.
+
+     The inset, the shape and the corner radius are unchanged, and the fill
+     still resolves through ?attr/colorBackground so it picks up the translucent
+     floating colour from values/colors.xml rather than hardcoding one. FacetUI
+     changes material, not shape.
+-->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:inset="16dp">
+    <shape android:shape="rectangle">
+        <corners android:radius="?attr/dialogCornerRadius" />
+        <solid android:color="?attr/colorBackground" />
+        <stroke
+            android:width="1dp"
+            android:color="#2EFFFFFF" />
+    </shape>
+</inset>

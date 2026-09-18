@@ -13,9 +13,21 @@ nothing in the logs. That failure mode is why this exists.
 Checks, per overlay:
 
   1. the XML is well-formed
-  2. every resource it overrides exists in the target tree
+  2. every resource it overrides exists in the target tree -- values, styles
+     and drawables alike
   3. the value it overrides differs from stock (an override equal to stock is
      dead weight, and usually means the stock value moved)
+  4. every overridden STYLE restates every item the stock style declares, and
+     keeps its parent
+
+Check 4 exists because an RRO replaces a style WHOLESALE. A style is a bag of
+attributes, and the overlay's bag replaces the target's rather than merging
+into it, so any item the original declared and the override forgets is simply
+gone at runtime -- with the app rendering subtly wrong and nothing logged.
+
+Whether every Android version merges or replaces is not worth betting a system
+theme on: restating is correct under either behaviour, harmless if it merges
+and essential if it does not. So this enforces restating.
 
 Resources the overlay deliberately introduces rather than overrides -- ones a
 FacetUI patch adds -- are declared in PATCH_PROVIDED and exempted from (2).
@@ -65,6 +77,70 @@ def parse_values(path):
         text = (el.text or "").strip()
         out[name] = (el.tag, text)
     return out
+
+
+def parse_styles(path):
+    """{name: (parent, {item names})} for every <style> in an XML file.
+
+    `parent` is the explicit parent attribute, or None when the style relies on
+    dot-notation to infer one. The two are not interchangeable: writing an
+    explicit parent onto a style that had an implicit one, or the reverse, can
+    silently move it in the hierarchy.
+    """
+    out = {}
+    try:
+        root = ET.parse(path).getroot()
+    except ET.ParseError as e:
+        raise ValueError(f"{path}: malformed XML: {e}")
+    for el in root:
+        if el.tag != "style":
+            continue
+        name = el.get("name")
+        if not name:
+            continue
+        items = {i.get("name") for i in el.findall("item") if i.get("name")}
+        out[name] = (el.get("parent"), items)
+    return out
+
+
+def scan_styles(root, res_dirs):
+    """Every <style> defined anywhere under the given res dirs."""
+    found = {}
+    for rd in res_dirs:
+        base = os.path.join(root, rd)
+        if not os.path.isdir(base):
+            continue
+        for dirpath, _, filenames in os.walk(base):
+            if not os.path.basename(dirpath).startswith("values"):
+                continue
+            for fn in filenames:
+                if not fn.endswith(".xml"):
+                    continue
+                try:
+                    for name, val in parse_styles(os.path.join(dirpath, fn)).items():
+                        found.setdefault(name, val)
+                except ValueError:
+                    pass
+    return found
+
+
+def scan_drawables(root, res_dirs):
+    """Names of every drawable and mipmap resource under the given res dirs."""
+    found = set()
+    for rd in res_dirs:
+        base = os.path.join(root, rd)
+        if not os.path.isdir(base):
+            continue
+        for entry in os.listdir(base):
+            kind = entry.split("-", 1)[0]
+            if kind not in ("drawable", "mipmap"):
+                continue
+            d = os.path.join(base, entry)
+            if not os.path.isdir(d):
+                continue
+            for fn in os.listdir(d):
+                found.add(os.path.splitext(fn)[0])
+    return found
 
 
 def scan_tree(root, res_dirs):
@@ -117,21 +193,38 @@ def main():
 
         # (1) well-formedness, always, even with no target tree available.
         declared = {}
+        styles = {}
+        drawables = {}
         for dirpath, _, filenames in os.walk(os.path.join(odir, "res")):
             qualifier = os.path.basename(dirpath)
+            kind = qualifier.split("-", 1)[0]
             for fn in sorted(filenames):
+                path = os.path.join(dirpath, fn)
+                # A drawable or mipmap is a whole file, not an entry in one.
+                if kind in ("drawable", "mipmap"):
+                    drawables[os.path.splitext(fn)[0]] = os.path.relpath(path, odir)
+                    if fn.endswith(".xml"):
+                        try:
+                            ET.parse(path)
+                        except ET.ParseError as e:
+                            print(f"  FAIL  {path}: malformed XML: {e}")
+                            failed += 1
+                    continue
                 if not fn.endswith(".xml"):
                     continue
                 try:
-                    for name, val in parse_values(os.path.join(dirpath, fn)).items():
+                    for name, val in parse_values(path).items():
                         declared[(qualifier, name)] = val
+                    for name, val in parse_styles(path).items():
+                        styles[name] = val
                 except ValueError as e:
                     print(f"  FAIL  {e}")
                     failed += 1
         manifest = os.path.join(odir, "AndroidManifest.xml")
         try:
             ET.parse(manifest)
-            print(f"  ok    manifest and {len(declared)} resources are well-formed")
+            print(f"  ok    manifest and {len(declared)} values, {len(styles)} "
+                  f"styles, {len(drawables)} drawables are well-formed")
         except (ET.ParseError, FileNotFoundError) as e:
             print(f"  FAIL  {manifest}: {e}")
             failed += 1
@@ -171,6 +264,58 @@ def main():
 
         for name, where in provided:
             print(f"  ok    {name} is provided by {where}, not stock -- exempt")
+
+        # (2b) drawables. A drawable override is a whole file replacing a whole
+        # file, so the only way to get it wrong is to name one the target does
+        # not have -- in which case it is simply dead weight in the APK.
+        if drawables:
+            stock_drawables = scan_drawables(tree, res_dirs)
+            absent = sorted(n for n in drawables if n not in stock_drawables)
+            checked += len(drawables)
+            if absent:
+                for n in absent:
+                    print(f"  FAIL  drawable {n} ({drawables[n]}) does not exist "
+                          f"in the target -- nothing will use it")
+                failed += len(absent)
+            else:
+                print(f"  ok    all {len(drawables)} overridden drawables exist "
+                      f"in the target")
+
+        # (4) styles. This is the one that can break things silently, because
+        # the overlay's bag replaces the target's rather than merging into it.
+        if styles:
+            stock_styles = scan_styles(tree, res_dirs)
+            style_failed = 0
+            for name, (parent, items) in sorted(styles.items()):
+                checked += 1
+                hit = stock_styles.get(name)
+                if hit is None:
+                    print(f"  FAIL  style {name} is not defined in the target -- "
+                          f"this override will silently do nothing")
+                    style_failed += 1
+                    continue
+                stock_parent, stock_items = hit
+
+                if (parent or None) != (stock_parent or None):
+                    print(f"  FAIL  style {name} declares parent "
+                          f"{parent!r} but stock has {stock_parent!r} -- "
+                          f"the override moves it in the hierarchy")
+                    style_failed += 1
+
+                dropped = sorted(stock_items - items)
+                if dropped:
+                    print(f"  FAIL  style {name} does not restate "
+                          f"{len(dropped)} item(s) stock declares: "
+                          f"{', '.join(dropped)}. An RRO replaces a style "
+                          f"wholesale, so these would be lost at runtime")
+                    style_failed += 1
+
+            failed += style_failed
+            if not style_failed:
+                total_items = sum(len(v[1]) for v in styles.values())
+                print(f"  ok    all {len(styles)} overridden styles keep their "
+                      f"parent and restate every stock item "
+                      f"({total_items} items declared)")
 
         for name, value in redundant:
             msg = (f"{name} is already {value} in stock; the override is dead "

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     FacetUI: glass dialogs.
+
+     These three attributes have existed in the platform since Android 12 and
+     are read straight off the window's theme by PhoneWindow.generateLayout():
+
+         if (a.getBoolean(R.styleable.Window_windowBlurBehindEnabled, false)) {
+             params.flags |= FLAG_BLUR_BEHIND;
+             params.setBlurBehindRadius(a.getDimensionPixelSize(
+                     Window_windowBlurBehindRadius, 0));
+         }
+         setBackgroundBlurRadius(a.getDimensionPixelSize(
+                 Window_windowBackgroundBlurRadius, 0));
+
+     No platform theme sets any of them. They are simply unused, which means a
+     resource overlay can turn them on with no code at all, and every Dialog
+     goes through PhoneWindow, so this reaches all of them at once.
+
+     WHY THESE TWO STYLES, AND ONLY THESE TWO
+
+     Overriding a style in an RRO replaces the whole style, so any attribute the
+     original declared and the override does not restate is lost. That makes a
+     big theme a dangerous thing to override.
+
+     Theme.Material.Dialog and Theme.Material.Light.Dialog are, in the platform,
+     completely EMPTY:
+
+         <style name="Theme.Material.Dialog" parent="Theme.Material.BaseDialog"/>
+
+     There is nothing in them to lose. Everything a dialog actually gets comes
+     from BaseDialog above, which is untouched, and every dialog variant in the
+     system inherits down through these two - Alert, MinWidth, NoActionBar,
+     their DeviceDefault counterparts, and so on. So this is the largest reach
+     available for the smallest possible risk.
+
+     The parents are restated explicitly and must stay correct; the style
+     override check in tools/validate-overlays.py enforces that.
+-->
+<resources>
+
+    <!-- Dark dialogs. -->
+    <style name="Theme.Material.Dialog" parent="Theme.Material.BaseDialog">
+        <!-- L2: the dialog panel itself samples what is behind it. -->
+        <item name="windowBackgroundBlurRadius">24dp</item>
+
+        <!-- L4: and the whole screen behind the dialog goes to the deepest
+             tier, so the dialog reads as a pane held above the app rather
+             than a card pasted onto it. -->
+        <item name="windowBlurBehindEnabled">true</item>
+        <item name="windowBlurBehindRadius">64dp</item>
+
+        <!-- Stock is 0.6 (0.7 on some DeviceDefault themes). That much black
+             over a blur is just black: the dim buries the effect the two
+             radii above pay for. Lowered to the point where the blur is what
+             separates the dialog from the app, and the dim only deepens it. -->
+        <item name="backgroundDimAmount">0.32</item>
+    </style>
+
+    <!-- Light dialogs. Same reasoning throughout. -->
+    <style name="Theme.Material.Light.Dialog" parent="Theme.Material.Light.BaseDialog">
+        <item name="windowBackgroundBlurRadius">24dp</item>
+        <item name="windowBlurBehindEnabled">true</item>
+        <item name="windowBlurBehindRadius">64dp</item>
+        <!-- Slightly higher than the dark theme: a light panel over blurred
+             content needs more separation from it to stay legible. -->
+        <item name="backgroundDimAmount">0.36</item>
+    </style>
+
+</resources>

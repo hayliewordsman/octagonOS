@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     FacetUI: popup and menu panels, dark. See the notes on the default
+     variant in drawable/ - in particular why this is a literal colour and what
+     that costs.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="2dp" />
+    <!-- 0xD4 = 83%. A dark panel over dark content needs to be a little more
+         open than a light one to read as a separate surface at all. -->
+    <solid android:color="#D41A1D24" />
+    <stroke
+        android:width="1dp"
+        android:color="#33FFFFFF" />
+</shape>

@@ -23,6 +23,9 @@ written in.
 | Icon pack | **Generated and verified.** `tools/verify-iconpack.py` passes: 68 resource files well-formed, 40 appfilter entries all resolving, 22 adaptive icons with every layer resolving, the tile present at 5 densities with a real alpha channel, no orphans, and every glyph inside both bounds -- worst at 28.1 of a 33-unit mask radius and 27.9 of a 30.2 table edge |
 | The glyph bounds check itself | Verified to fail on purpose: regenerating the pack with the pre-fix constants makes it name all fifteen offending glyphs and exit non-zero, while the mask-only check it replaced still passes at 32.4 of 33 |
 | Octagon icon mask | The path is a true regular octagon, checked numerically: all eight sides 41.4214 |
+| Dialog glass | The theme path was read out of `PhoneWindow.generateLayout()` rather than assumed: all three blur attributes are consumed there unconditionally, and no platform theme sets any of them. `Theme.Material.Dialog` and its Light twin were confirmed empty in the platform, so overriding them risks losing nothing |
+| The popup limitation | Also checked rather than assumed: `Dialog` builds a `PhoneWindow`, and `PopupWindow` contains no blur API at all. Menus get tint and a hairline, and the overlay says so |
+| Style and drawable overrides | `validate-overlays.py` now covers both. All three new failure modes verified to fail on purpose: a dropped style item (named all 20), a changed parent, and a drawable absent from the target |
 | Every symbol the patches introduce | Checked to be imported or declared, including `Icon.createWithResource(String, int)` being the public overload and not the one marked "Do not use", and `isAmbient`/`notifKey` existing on `ActiveNotificationIconModel` |
 | Overlay resources | `tools/validate-overlays.py` passes: every overridden resource exists in its target tree, with the patch-provided ones exempted by name |
 | Form-factor detection | `tools/test-formfactor-detect.sh` passes 7 cases, including a bitmask whose top bit is set and therefore wraps negative in 64-bit shell arithmetic |
@@ -38,6 +41,7 @@ written in.
 | The icon pack, built | Same: the pack's `res/` is generated and verified, but it has never been packaged into an APK |
 | Whether icons actually look right on a device | The preview renders the adaptive icon's own group transform, so it should match -- but it is Pillow's rasteriser, not Android's. Thin strokes and the `evenOdd` fill are where the two are most likely to disagree |
 | Whether the overlays take effect | `android:isStatic` is deprecated, so an overlay in `/product/overlay` may need `cmd overlay enable`. The first-boot script does that, but the script has not run |
+| The cost of blur-behind on dialogs | `windowBlurBehindEnabled` blurs the entire screen behind every dialog. That is the most expensive thing FacetUI asks for, and on an unmeasured GPU it is the first candidate to turn off |
 | Whether blur renders acceptably | `ro.surface_flinger.supports_background_blur=1` makes SurfaceFlinger attempt blur. Whether it holds frame rate is a per-device measurement nobody has taken |
 | SELinux for the first-boot service | The service ships with no seclabel, deliberately. On an enforcing build it will not have the permissions it needs. Policy is owed |
 | The GSI itself | **No image has been built.** A GSI needs roughly 250-400 GB and many CPU-hours; see [building.md](building.md) |
@@ -86,6 +90,10 @@ re-check:
 - [ ] Confirm the boot animation centres correctly on a near-square display,
       which is the case the square canvas exists for and the one no emulator
       profile covers by default
+- [ ] Measure a dialog open with blur-behind on. If it drops frames, drop
+      `windowBlurBehindEnabled` first and keep `windowBackgroundBlurRadius`
+- [ ] Decide whether menus are worth a `PopupWindow` patch, or whether tint and
+      a hairline is enough for them
 - [ ] Look at the icons on a real launcher at real density. 48dp is much smaller
       than any preview here, and legibility at that size is the whole question
 - [ ] Check the icon engine's cost on a cold app-drawer open. It composes an
