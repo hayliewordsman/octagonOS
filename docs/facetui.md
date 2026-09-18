@@ -238,6 +238,34 @@ dynamic reference: the background is the surface the blur shows through, so it
 buys the whole effect, while the keys, which are what the eye actually reads,
 keep the wallpaper palette.
 
+## Validating the shaders without a device
+
+```bash
+pip install skia-python        # plus libegl1 libgl1 on Linux
+tools/validate-shaders.py
+```
+
+AGSL is Android's binding of Skia runtime effects, so Skia's own SkSL compiler
+rejects most of what Android would -- with no SDK, no emulator and no device.
+**Both FacetUI shaders compile.**
+
+The tool proves the compiler is awake before trusting it, on five deliberately
+broken shaders: an undeclared variable, a type mismatch, a missing `main`, a
+syntax error and a wrong `main` signature. All five are rejected and a valid
+shader is accepted. Without that, "it compiles" would only mean the compiler
+never says no.
+
+It also checks the things that *claim* to mirror the AGSL and were, until now,
+on trust: that `bootanimation/facet_math.py` still uses the same falloff and
+centre-bias constants the shader does, and that the four FacetUI parameters
+agree across the shader defaults, `ScrimView`, the boot animation and the icon
+pack. This repository says throughout that the boot screen, the shade and the
+app icons are lit by the same maths; that sentence is now enforced rather than
+asserted.
+
+A pass is strong evidence, not proof: SkSL is not AGSL, and this is not the
+Skia in any given Android release. titan2e-eos's on-device harness settles it.
+
 ## What is still outstanding at Tier 3
 
 - refraction at panel edges, sampling what is behind the surface. Ruled out for

@@ -28,7 +28,7 @@ including everything that has not, is in **[docs/status.md](docs/status.md)**.
 | Popup glass patch | **Applies cleanly**, alone and alongside the SystemUI three. Never compiled |
 | Icon pack | **Generated and verified.** 22 icons, 40 components, all checks pass. Never packaged — no SDK here |
 | Form-factor detection | **7/7 tests pass**, against synthetic bitmasks |
-| The AGSL shaders | **Never handed to a shader compiler.** Most likely thing to fail first |
+| The AGSL shaders | **Both compile** under Skia's SkSL compiler. Not yet Android's own |
 | The GSI itself | **Not built.** Needs 250–400 GB |
 
 Base is `lineage-24.0`, confirmed Android 17 by
@@ -126,6 +126,9 @@ SKIP_APK=1 iconpack/build.sh  # generates and verifies the icons; no SDK needed
 tools/validate-overlays.py --systemui <frameworks/base> \
                            --launcher <Launcher3> --ime <LatinIME>
 tools/test-formfactor-detect.sh
+
+pip install skia-python        # plus libegl1 libgl1 on Linux
+tools/validate-shaders.py      # compiles the AGSL; no SDK, no device
 ```
 
 Full instructions, both tiers: [docs/building.md](docs/building.md).

@@ -30,6 +30,8 @@ written in.
 | Every symbol the patches introduce | Checked to be imported or declared, including `Icon.createWithResource(String, int)` being the public overload and not the one marked "Do not use", and `isAmbient`/`notifKey` existing on `ActiveNotificationIconModel` |
 | Overlay resources | `tools/validate-overlays.py` passes: every overridden resource exists in its target tree, with the patch-provided ones exempted by name |
 | Form-factor detection | `tools/test-formfactor-detect.sh` passes 7 cases, including a bitmask whose top bit is set and therefore wraps negative in 64-bit shell arithmetic |
+| **The AGSL, compiled** | **Both shaders compile** under Skia's own SkSL compiler, via `tools/validate-shaders.py`. The compiler was first proven awake on five deliberately broken shaders -- undeclared variable, type mismatch, missing `main`, syntax error, wrong `main` signature -- all rejected, and a valid one accepted |
+| FacetUI constants, everywhere | The same tool checks that `facet_math.py` still matches the AGSL's own literals, and that the four parameter values agree across the shader defaults, `ScrimView` and both generators. Verified to fail on purpose by drifting one of each |
 
 ## Not verified
 
@@ -37,7 +39,7 @@ written in.
 |---|---|
 | **Any of it, on hardware** | **Nothing here has been near a phone.** No device, no emulator |
 | The patches, compiled | They apply. They have never been built. Expect to fix something on the first compile |
-| The AGSL, compiled | The two shaders have never been handed to a shader compiler. This is the single likeliest thing to fail first |
+| The AGSL, on Android's own compiler | Skia has compiled both, but AGSL is Android's *binding* of Skia runtime effects and this is not the Skia in any given release. Strong evidence, not proof |
 | The overlays, built | No Android SDK in this environment, so `aapt2` never ran. The sources validate; the APKs do not exist |
 | The icon pack, built | Same: the pack's `res/` is generated and verified, but it has never been packaged into an APK |
 | Whether icons actually look right on a device | The preview renders the adaptive icon's own group transform, so it should match -- but it is Pillow's rasteriser, not Android's. Thin strokes and the `evenOdd` fill are where the two are most likely to disagree |
@@ -47,15 +49,17 @@ written in.
 | SELinux for the first-boot service | The service ships with no seclabel, deliberately. On an enforcing build it will not have the permissions it needs. Policy is owed |
 | The GSI itself | **No image has been built.** A GSI needs roughly 250-400 GB and many CPU-hours; see [building.md](building.md) |
 
-## The three things most likely to break first
+## The things most likely to break first
 
-**The AGSL.** Everything else in the Tier 3 path is ordinary Java and Kotlin
-that a compiler will check. The shaders are strings, compiled at runtime by
-Skia, and a mistake in them surfaces as a blank surface or a crash on the first
-frame, not as a build error. titan2e-eos ships `tools/shader-check/`, a ~20 MB
-Android app that compiles this AGSL without a 300 GB tree; that is the cheapest
-way to retire this risk and it applies unchanged here, because the shader bodies
-are unchanged.
+**~~The AGSL.~~ Retired, mostly.** This was the top of this list for the whole
+project: the shaders are strings compiled at runtime by Skia, so a mistake in
+them is a blank surface or a first-frame crash rather than a build error.
+
+Both now compile under Skia's own SkSL compiler
+(`tools/validate-shaders.py`). What remains is the gap between SkSL and AGSL,
+which is Android's binding of it, and between this Skia and the one in a given
+Android release. titan2e-eos's on-device harness is what closes that, and it
+applies unchanged here because the shader bodies are unchanged.
 
 **The icon engine, on a device with many apps.** It runs inside the icon load
 path for every app on the system. The composition itself is cheap -- an
@@ -84,7 +88,9 @@ re-check:
 ## Open items
 
 - [ ] **Compile something.** Nothing here has been built
-- [ ] Run `tools/shader-check` (from titan2e-eos) against the two AGSL shaders
+- [x] Compile the AGSL. Both shaders pass Skia's SkSL compiler
+- [ ] Run titan2e-eos's on-device harness to confirm against Android's own AGSL
+      compiler, which is the only thing that settles it
 - [ ] Write an SELinux domain for `octagonos-formfactor`
 - [ ] Build the overlays and confirm `cmd overlay list` shows all four
 - [ ] Measure blur cost on a real GPU before recommending `config_sf_slowBlur=false`
