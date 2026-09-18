@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     FacetUI - Clock.
+
+     One hardcoded surface. Small, but it is the shortcut background the launcher
+     shows, so it sits next to the FacetUI icons and was the one grey square
+     among them.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.octagonos.facetui.deskclock">
+    <application android:hasCode="false" />
+    <overlay
+        android:targetPackage="com.android.deskclock"
+        android:isStatic="true"
+        android:priority="900" />
+</manifest>

@@ -110,12 +110,12 @@ keyboard, and a bitmask that wraps negative in 64-bit shell arithmetic.
 | Path | What it is |
 |---|---|
 | [`bootanimation/`](bootanimation/) | The generator, and `facet_math.py` — FacetUI's AGSL transcribed to NumPy |
-| [`overlay/`](overlay/) | Four RRO overlays: SystemUI, framework, launcher, IME |
+| [`overlay/`](overlay/) | Eight RRO overlays: SystemUI, framework, launcher, IME, and four apps |
 | [`iconpack/`](iconpack/) | The icon generator, and the generated pack |
 | [`patches/`](patches/) | Source patches for what resources cannot express |
 | [`product/`](product/) | Product makefile, first-boot form-factor service |
 | [`tools/`](tools/) | Verifiers — boot animation, overlays, icon pack, form-factor detection |
-| [`docs/`](docs/) | [status](docs/status.md) · [FacetUI](docs/facetui.md) · [icons](docs/icons.md) · [building](docs/building.md) · [boot animation](docs/bootanimation.md) · [keyboards and slabs](docs/keyboards-and-slabs.md) |
+| [`docs/`](docs/) | [status](docs/status.md) · [FacetUI](docs/facetui.md) · [icons](docs/icons.md) · [app coverage](docs/app-coverage.md) · [building](docs/building.md) · [boot animation](docs/bootanimation.md) · [keyboards and slabs](docs/keyboards-and-slabs.md) |
 
 ## Quick start
 

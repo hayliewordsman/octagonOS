@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Stock: @android:color/white - literally white, following nothing. -->
+    <color name="app_background_color">@android:color/system_accent2_50</color>
+    <color name="background_floating">@android:color/system_accent2_50</color>
+    <!-- Stock: #1E88E5, a hardcoded Material Blue 600 from before dynamic
+         colour existed. This is the app's accent: tabs, selection, the action
+         bar. On the accent ramp rather than the muted one, because it is meant
+         to be seen. -->
+    <color name="primary">@android:color/system_accent1_600</color>
+</resources>

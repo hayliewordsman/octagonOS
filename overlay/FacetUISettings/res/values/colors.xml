@@ -1,32 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-     Light theme. Opaque on purpose: these are view backgrounds inside the
-     app's window, so there is nothing behind them to blur and translucency
-     would only let the list scroll visibly through its own header.
+     Light theme.
 
-     The values sit on FacetUI's cool blue-violet axis rather than the neutral
-     greys stock uses, so Settings shares a palette with the shade above it and
-     the icons on the homescreen behind it.
+     These are REFERENCES, not literals, and that is the whole point. The stock
+     values are @android:color/system_neutral1_* and system_neutral2_* - the
+     wallpaper-derived palette. An earlier version of this file replaced them
+     with fixed hex, which pinned Settings to one blue and broke its colour
+     following on every other wallpaper. That was wrong, and it contradicted
+     FacetUI's own rule, which is to pull the tint FROM the system accent so a
+     surface samples the wallpaper rather than flattening it.
+
+     The FacetUI move is not neutral-to-fixed, it is neutral-to-ACCENT: the same
+     dynamic palette, read off the accent ramp instead of the grey one, so
+     Settings' surfaces carry the wallpaper's hue the way the shade does.
+     system_accent2 is the muted ramp, which is what large surfaces want -
+     accent1 at these weights would be loud.
+
+     These are opaque on purpose. They are view backgrounds inside the app's
+     window, so there is nothing behind them to blur.
 -->
 <resources>
-    <!-- The collapsing toolbar header - the large title area at the top of
-         every Settings page, and the closest thing the app has to a menu bar.
-         Stock: @android:color/system_neutral1_100, a warm-neutral grey. -->
-    <color name="settingslib_colorSurfaceHeader">#EEF1F7FC</color>
+    <!-- The collapsing toolbar header, the app's closest thing to a menu bar.
+         Stock: @android:color/system_neutral1_100. -->
+    <color name="settingslib_colorSurfaceHeader">@android:color/system_accent2_100</color>
 
     <!-- The main surface behind preference lists.
          Stock: @color/settingslib_surface_light. -->
-    <color name="settingslib_colorSurface">#FFFAFBFE</color>
+    <color name="settingslib_colorSurface">@android:color/system_accent2_50</color>
 
     <!-- Raised surfaces: switch bars, selected rows, inline cards.
          Stock: @android:color/system_neutral2_100. -->
-    <color name="settingslib_colorSurfaceVariant">#FFE7ECF6</color>
+    <color name="settingslib_colorSurfaceVariant">@android:color/system_accent2_100</color>
 
-    <!-- Settings' own dialogs. Tinted to match the framework glass dialogs
-         rather than made translucent: these are AppCompat dialogs, which do
-         not inherit the platform blur, so translucency here would be a tinted
-         window with nothing behind it.
-         Stock: @color/settingslib_surface_light on v31,
-         @color/settingslib_materialColorSurfaceContainerHigh on v36. -->
-    <color name="settingslib_dialog_background">#FFF4F7FC</color>
+    <!-- Settings' own dialogs. Tinted, not made translucent: these are
+         AppCompat dialogs, which do not inherit the platform blur, so
+         translucency would be a tinted window with nothing behind it.
+         Stock: @color/settingslib_surface_light. -->
+    <color name="settingslib_dialog_background">@android:color/system_accent2_50</color>
 </resources>

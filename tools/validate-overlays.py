@@ -19,6 +19,18 @@ Checks, per overlay:
      dead weight, and usually means the stock value moved)
   4. every overridden STYLE restates every item the stock style declares, and
      keeps its parent
+  5. no override replaces a wallpaper-derived colour with a fixed literal
+
+Check 5 exists because this repository got it wrong. The first Settings overlay
+replaced @android:color/system_neutral1_100 and friends with hex, which pinned
+the app to one blue and broke its colour following on every other wallpaper -
+the exact opposite of FacetUI's own rule, which is to pull a surface's tint FROM
+the system accent rather than flatten it. The FacetUI move is neutral-to-ACCENT,
+not dynamic-to-fixed.
+
+It is a shallow check: it compares the immediate stock value, so it sees
+@android:color/system_* and not a reference that resolves to one indirectly.
+That catches the common case and is honest about the rest.
 
 Check 4 exists because an RRO replaces a style WHOLESALE. A style is a bag of
 attributes, and the overlay's bag replaces the target's rather than merging
@@ -50,6 +62,23 @@ PATCH_PROVIDED = {
     "facetui_popup_blur_radius": "patches/framework/0001",
 }
 
+#: Resources where overriding a dynamic colour with a fixed literal is a
+#: deliberate, documented trade-off rather than a mistake. Everything else that
+#: does it fails check 5.
+#:
+#: The only reason to be on this list is that resource XML cannot apply alpha
+#: to a colour REFERENCE - only to a literal - so any surface that has to be
+#: translucent must give up dynamic colour to get there.
+LITERAL_INTENTIONAL = {
+    "keyboard_background_you":
+        "the keyboard must be translucent for the blur behind it to show, and "
+        "alpha cannot be applied to a colour reference. See "
+        "overlay/FacetUIIME/res/values/colors.xml",
+    "emoji_tab_page_indicator_background_you":
+        "same window as the keyboard; an opaque slab beside a translucent one "
+        "would read as a seam",
+}
+
 #: overlay directory -> list of (target tree argument, res dirs to scan).
 #:
 #: A list, because an APK's resource table is not always one repository. A
@@ -67,6 +96,9 @@ OVERLAYS = {
         ("settings", ["res"]),
         ("systemui", ["packages/SettingsLib"]),
     ],
+    "FacetUIDocumentsUI": [("apps", ["DocumentsUI/res"])],
+    "FacetUIEtar": [("apps", ["Etar/app/src/main/res"])],
+    "FacetUIDeskClock": [("apps", ["DeskClock/res"])],
 }
 
 VALUE_TAGS = {"bool", "color", "dimen", "integer", "string", "item",
@@ -189,12 +221,13 @@ def main():
     ap.add_argument("--launcher", help="path to a Launcher3 checkout")
     ap.add_argument("--ime", help="path to a LatinIME checkout")
     ap.add_argument("--settings", help="path to a Settings checkout")
+    ap.add_argument("--apps", help="directory holding the per-app checkouts")
     ap.add_argument("--strict-redundant", action="store_true",
                     help="treat an override equal to stock as a failure")
     args = ap.parse_args()
 
     trees = {"systemui": args.systemui, "launcher": args.launcher,
-             "ime": args.ime, "settings": args.settings}
+             "ime": args.ime, "settings": args.settings, "apps": args.apps}
     failed = 0
     checked = 0
     skipped = []
@@ -274,6 +307,16 @@ def main():
         # them under plain values and values-night. Matching qualifiers for the
         # existence check reported every one of those as missing.
         stock_names = {name for _, name in stock}
+
+        # Every value stock gives a name, across all qualifiers. The dynamic
+        # check needs this for the same reason the existence check does: a
+        # resource defined only under values-v31 is not findable at ("values",
+        # name), and looking for it there is how the first version of the
+        # dynamic check managed to pass on the very mistake it was written to
+        # catch.
+        stock_values_by_name = {}
+        for (_, name), (_, value) in stock.items():
+            stock_values_by_name.setdefault(name, set()).add(value)
         missing, redundant, provided = [], [], []
         for (qualifier, name), (tag, value) in sorted(declared.items()):
             checked += 1
@@ -291,6 +334,26 @@ def main():
             hit = stock.get((qualifier, name)) or stock.get(("values", name))
             if hit is not None and hit[1] == value:
                 redundant.append((name, value))
+
+        # (5) dynamic colour must survive.
+        flattened = []
+        for (qualifier, name), (tag, value) in sorted(declared.items()):
+            if tag != "color" or not value.startswith("#"):
+                continue
+            if name in LITERAL_INTENTIONAL:
+                continue
+            dynamic = [v for v in stock_values_by_name.get(name, ())
+                       if re.match(r"@\*?android:color/system_", v)]
+            if dynamic:
+                flattened.append((name, sorted(dynamic)[0], value))
+        if flattened:
+            for name, was, now in flattened:
+                print(f"  FAIL  {name} replaces the wallpaper-derived {was} "
+                      f"with the fixed literal {now} -- this surface stops "
+                      f"following the system palette. Use an accent ramp "
+                      f"reference, or add it to LITERAL_INTENTIONAL with a "
+                      f"reason")
+            failed += len(flattened)
 
         if missing:
             for qualifier, name in missing:

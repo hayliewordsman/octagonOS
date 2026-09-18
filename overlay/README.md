@@ -8,7 +8,10 @@ Resource-only changes. No recompile, so these work against a prebuilt GSI.
 | `FacetUIFramework` | `android` | SurfaceFlinger blur quality, the octagonal icon mask, **glass dialogs**, popup and menu panels |
 | `FacetUILauncher` | `com.android.launcher3` | Homescreen folders, popups, organizer |
 | `FacetUIIME` | `com.android.inputmethod.latin` | Virtual keyboard translucency |
-| `FacetUISettings` | `com.android.settings` | Settings surfaces, on FacetUI's palette |
+| `FacetUISettings` | `com.android.settings` | Settings surfaces, on the accent ramp |
+| `FacetUIDocumentsUI` | `com.android.documentsui` | Files: white backgrounds and a fixed blue, made dynamic |
+| `FacetUIEtar` | `org.lineageos.etar` | Calendar: structural surfaces made dynamic |
+| `FacetUIDeskClock` | `com.android.deskclock` | Clock: one hardcoded shortcut background |
 
 ## Validate before building
 

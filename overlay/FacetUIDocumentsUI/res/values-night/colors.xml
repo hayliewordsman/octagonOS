@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="app_background_color">@android:color/system_accent2_900</color>
+    <color name="background_floating">@android:color/system_accent2_800</color>
+    <!-- Lighter weight in dark: accent1_600 on a dark surface fails contrast. -->
+    <color name="primary">@android:color/system_accent1_200</color>
+</resources>

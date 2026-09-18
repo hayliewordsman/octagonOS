@@ -38,7 +38,10 @@ PRODUCT_PACKAGES += \
     FacetUIFramework \
     FacetUILauncher \
     FacetUIIME \
-    FacetUISettings
+    FacetUISettings \
+    FacetUIDocumentsUI \
+    FacetUIEtar \
+    FacetUIDeskClock
 
 # --- FacetUI icons ----------------------------------------------------------
 # The curated icon pack. Not an overlay: an RRO can only override resources a

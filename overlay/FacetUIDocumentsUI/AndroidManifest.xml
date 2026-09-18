@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     FacetUI - Files.
+
+     Its structural surfaces are hardcoded: plain white backgrounds and a fixed
+     #1E88E5 blue that follows nothing. This puts them on the system's dynamic
+     palette, which is what the rest of the system already uses.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.octagonos.facetui.documentsui">
+    <application android:hasCode="false" />
+    <overlay
+        android:targetPackage="com.android.documentsui"
+        android:isStatic="true"
+        android:priority="900" />
+</manifest>

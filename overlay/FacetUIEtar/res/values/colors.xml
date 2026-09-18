@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Stock: #fafafa. -->
+    <color name="background_color">@android:color/system_accent2_50</color>
+    <!-- Stock: #FFF2F2F2. -->
+    <color name="month_bgcolor">@android:color/system_accent2_50</color>
+    <!-- Stock: #ffEEEEEE. -->
+    <color name="calendar_hour_background">@android:color/system_accent2_100</color>
+    <!-- Stock: #eeeeee. -->
+    <color name="calendar_date_banner_background">@android:color/system_accent2_100</color>
+    <!-- Stock: #FFFFFFFF. -->
+    <color name="agenda_day_bar_background_color">@android:color/system_accent2_50</color>
+</resources>

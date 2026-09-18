@@ -1,20 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-     Dark theme. Same reasoning as the default variant; see the notes there.
-     These are deep blue-blacks rather than the neutral greys stock uses, so
-     they sit on the same axis as the shade and the glass panels.
--->
+<!-- Dark theme. Same reasoning as the default variant; see the notes there. -->
 <resources>
     <!-- Stock: @android:color/system_neutral1_700. -->
-    <color name="settingslib_colorSurfaceHeader">#FF232732</color>
-
+    <color name="settingslib_colorSurfaceHeader">@android:color/system_accent2_800</color>
     <!-- Stock: @color/settingslib_surface_dark. -->
-    <color name="settingslib_colorSurface">#FF14171E</color>
-
+    <color name="settingslib_colorSurface">@android:color/system_accent2_900</color>
     <!-- Stock: @android:color/system_neutral1_700. -->
-    <color name="settingslib_colorSurfaceVariant">#FF2A2F3C</color>
-
-    <!-- Stock: @color/settingslib_surface_dark on v31,
-         @color/settingslib_materialColorSurfaceContainerHigh on v36. -->
-    <color name="settingslib_dialog_background">#FF1D212A</color>
+    <color name="settingslib_colorSurfaceVariant">@android:color/system_accent2_700</color>
+    <!-- Stock: @color/settingslib_surface_dark. -->
+    <color name="settingslib_dialog_background">@android:color/system_accent2_800</color>
 </resources>

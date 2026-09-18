@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     FacetUI - Calendar.
+
+     Etar carries 234 hardcoded colours, none of which follow the system. Only
+     the structural surfaces are touched here - the grid, the hour column, the
+     date banner - because those are what make it read as a different system.
+     The event colours are the user's own data and are left alone.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.octagonos.facetui.etar">
+    <application android:hasCode="false" />
+    <overlay
+        android:targetPackage="org.lineageos.etar"
+        android:isStatic="true"
+        android:priority="900" />
+</manifest>
