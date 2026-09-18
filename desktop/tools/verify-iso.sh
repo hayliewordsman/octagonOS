@@ -94,8 +94,12 @@ if ! command -v unsquashfs >/dev/null; then
 else
     # Only what the defaults check needs, not the whole root: a full unpack is
     # gigabytes and answers nothing extra.
+    # /etc/alternatives is in this list because the boot splash is selected
+    # through it: default.plymouth is a symlink into it, and without it the
+    # chain dangles and the theme check has nothing to follow.
     unsquashfs -d "$TMP/root" -f "$TMP/fs.squashfs" \
-        '/etc/xdg' '/usr/share/icons/FacetUI' '/usr/share/color-schemes' \
+        '/etc/xdg' '/etc/alternatives' '/usr/share/icons/FacetUI' \
+        '/usr/share/color-schemes' \
         '/usr/share/plasma' '/usr/share/plymouth' '/usr/lib' \
         >/dev/null 2>&1 || true
 

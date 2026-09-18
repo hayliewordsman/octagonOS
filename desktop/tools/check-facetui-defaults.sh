@@ -40,9 +40,23 @@ mkdir -p "$HOMEDIR/.config"
 
 # A user with nothing of their own. On a fresh install or a live session that
 # is every user, which is the case this has to be right for.
+#
+# Built as an array and handed to `env`, NOT written as a bare assignment
+# prefix. Bash recognises assignments SYNTACTICALLY, before expansion, so
+# `${ROOT:+XDG_CONFIG_DIRS=...}` is not an assignment at all -- it expands to
+# a plain word, which bash then tries to run as the command. That is what it
+# did: kreadconfig6 never executed, every value came back empty, and the
+# checker reported six confident FAILs about an image it had not looked at.
+#
+# It only broke with --root. Without it the expansion is empty and the line
+# works, which is why the package-install check passed and the ISO check --
+# the case this argument exists for -- did not.
 read_key() {
-    HOME="$HOMEDIR" XDG_CONFIG_HOME="$HOMEDIR/.config" \
-    ${ROOT:+XDG_CONFIG_DIRS="$ROOT/etc/xdg"} \
+    local -a envs=(HOME="$HOMEDIR" XDG_CONFIG_HOME="$HOMEDIR/.config")
+    if [ -n "$ROOT" ]; then
+        envs+=(XDG_CONFIG_DIRS="$ROOT/etc/xdg")
+    fi
+    env "${envs[@]}" \
         kreadconfig6 --file "$1" --group "$2" --key "$3" --default "<unset>"
 }
 
@@ -51,6 +65,15 @@ check_key() {
     local file="$1" group="$2" key="$3" want="$4"
     local got
     got="$(read_key "$file" "$group" "$key")"
+    # --default guarantees kreadconfig6 prints SOMETHING. Empty output means
+    # it never ran, and the honest response is to stop rather than to blame
+    # the image for a value this script failed to read.
+    if [ -z "$got" ]; then
+        echo "  ERROR kreadconfig6 produced no output for $file [$group] $key;"
+        echo "        this is a fault in the checker, not a finding about the"
+        echo "        image. Refusing to report a result."
+        exit 3
+    fi
     if [ "$got" = "$want" ]; then
         printf "  ok    %-10s [%s] %s = %s\n" "$file" "$group" "$key" "$got"
     else
@@ -98,9 +121,43 @@ fi
 # Plymouth is not an XDG setting at all: the boot theme is an alternative, and
 # it is chosen before any user exists.
 echo "[*] the boot splash"
-alt="$(chroot ${ROOT:-/} update-alternatives --query default.plymouth 2>/dev/null \
-       | sed -n 's/^Value: //p')"
+# Resolved by following the symlink chain, NOT by asking update-alternatives.
+#
+# Two reasons, and the second is the one that bit. Plymouth does not consult
+# the alternatives database at boot -- it opens
+# /usr/share/plymouth/themes/default.plymouth and follows wherever it leads,
+# so that chain is the thing worth checking. And `chroot $ROOT
+# update-alternatives` needs a shell, perl and the dpkg admin directory inside
+# $ROOT; the image verifier unpacks only /usr/share and /etc, so the command
+# could never run there. It returned nothing, and nothing was read as "no
+# alternative is set" -- a FAIL reported against an image that was correct.
+#
+# Absolute link targets are resolved against $ROOT, because inside the image
+# that is what they mean. `readlink -f` on the host would follow them to the
+# host's own filesystem and answer a question about this machine instead.
+resolve_in_root() {
+    local p="$1" n=0 t
+    while [ -L "$ROOT$p" ] && [ "$n" -lt 20 ]; do
+        t="$(readlink "$ROOT$p")"
+        case "$t" in
+            /*) p="$t" ;;
+            *)  p="$(dirname "$p")/$t" ;;
+        esac
+        n=$((n + 1))
+    done
+    printf '%s' "$p"
+}
+
+alt="$(resolve_in_root /usr/share/plymouth/themes/default.plymouth)"
+if [ "$alt" = /usr/share/plymouth/themes/default.plymouth ]; then
+    alt=""                      # nothing followed: the link is not there
+elif [ ! -e "$ROOT$alt" ]; then
+    echo "  FAIL  default.plymouth resolves to $alt, which does not exist"
+    fail=1
+    alt="__dangling__"
+fi
 case "$alt" in
+    __dangling__) ;;
     */octagonos/octagonos.plymouth)
         echo "  ok    default.plymouth points at octagonos" ;;
     "")
