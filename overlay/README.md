@@ -8,6 +8,7 @@ Resource-only changes. No recompile, so these work against a prebuilt GSI.
 | `FacetUIFramework` | `android` | SurfaceFlinger blur quality, the octagonal icon mask, **glass dialogs**, popup and menu panels |
 | `FacetUILauncher` | `com.android.launcher3` | Homescreen folders, popups, organizer |
 | `FacetUIIME` | `com.android.inputmethod.latin` | Virtual keyboard translucency |
+| `FacetUISettings` | `com.android.settings` | Settings surfaces, on FacetUI's palette |
 
 ## Validate before building
 
@@ -66,3 +67,29 @@ does that on first boot; confirm with:
 ```bash
 adb shell cmd overlay list | grep -i facetui
 ```
+
+## Per-app overlays are colour, not glass
+
+The system overlays above can make surfaces glass because the surfaces they
+touch are *windows* -- the shade, dialogs, menus, the keyboard -- and a window
+can blur what is behind it.
+
+An app's own headers, cards and list backgrounds are **views inside the app's
+single window**, and Android has no backdrop blur for a view: a view can blur
+its own content, not what is painted beneath it in the same window. So a
+per-app overlay aligns the app's palette with FacetUI and stops there. Making
+an app bar genuinely glass would need per-app code, not a resource.
+
+Some apps narrow it further. Settings' own dialogs are AppCompat, bundled into
+its APK rather than inherited from the platform, so the framework dialog glass
+does not reach them; overriding a bundled AppCompat theme would mean restating
+every item it declares, and its source is not in the tree to read. Left alone,
+deliberately.
+
+### One APK, more than one repository
+
+A statically linked library's resources compile into the app that links it and
+become overridable entries of *that* package. `FacetUISettings` names resources
+that only exist in SettingsLib, which lives in `frameworks/base` --
+`validate-overlays.py` checks both trees for that overlay, because checking the
+app's own `res/` alone would report every one of them as missing.

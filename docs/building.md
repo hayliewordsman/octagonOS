@@ -29,7 +29,15 @@ from titan2e-eos.
 tools/validate-overlays.py \
     --systemui ~/src/frameworks_base \
     --launcher ~/src/Launcher3 \
-    --ime      ~/src/LatinIME
+    --ime      ~/src/LatinIME \
+    --settings ~/src/Settings
+
+# Cloning a whole app just to read its res/ is wasteful. A sparse clone of
+# one directory is seconds and a fraction of the size:
+#
+#   git clone --depth 1 --filter=blob:none --sparse -b lineage-24.0 \
+#       https://github.com/LineageOS/android_packages_apps_Settings ~/src/Settings
+#   git -C ~/src/Settings sparse-checkout set res
 
 # 2. Build the overlays. Needs the Android SDK.
 export ANDROID_JAR=$ANDROID_HOME/platforms/android-37/android.jar
@@ -68,6 +76,7 @@ titan2e-eos/tools/inject-ime.sh \
   --add-file overlay/out/FacetUIFramework.apk:product/overlay/FacetUIFramework.apk \
   --add-file overlay/out/FacetUILauncher.apk:product/overlay/FacetUILauncher.apk \
   --add-file overlay/out/FacetUIIME.apk:product/overlay/FacetUIIME.apk \
+  --add-file overlay/out/FacetUISettings.apk:product/overlay/FacetUISettings.apk \
   --add-file iconpack/out/FacetUIIcons.apk:product/app/FacetUIIcons/FacetUIIcons.apk \
   --add-file bootanimation/out/bootanimation.zip:system/media/bootanimation.zip \
   --add-file product/octagonos/bin/octagonos-formfactor.sh:system/bin/octagonos-formfactor.sh \

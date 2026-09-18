@@ -50,12 +50,23 @@ PATCH_PROVIDED = {
     "facetui_popup_blur_radius": "patches/framework/0001",
 }
 
-#: overlay directory -> (target tree argument, list of res dirs to scan)
+#: overlay directory -> list of (target tree argument, res dirs to scan).
+#:
+#: A list, because an APK's resource table is not always one repository. A
+#: statically linked library's resources are compiled into the app that links
+#: it and become overridable entries of THAT package, so an overlay targeting
+#: com.android.settings can legitimately name a resource that only exists in
+#: SettingsLib, which lives in frameworks/base. Checking the app's own res
+#: alone would report those as missing and be wrong.
 OVERLAYS = {
-    "FacetUISystemUI": ("systemui", ["packages/SystemUI/res"]),
-    "FacetUIFramework": ("systemui", ["core/res/res"]),
-    "FacetUILauncher": ("launcher", ["res"]),
-    "FacetUIIME": ("ime", ["java/res"]),
+    "FacetUISystemUI": [("systemui", ["packages/SystemUI/res"])],
+    "FacetUIFramework": [("systemui", ["core/res/res"])],
+    "FacetUILauncher": [("launcher", ["res"])],
+    "FacetUIIME": [("ime", ["java/res"])],
+    "FacetUISettings": [
+        ("settings", ["res"]),
+        ("systemui", ["packages/SettingsLib"]),
+    ],
 }
 
 VALUE_TAGS = {"bool", "color", "dimen", "integer", "string", "item",
@@ -177,16 +188,18 @@ def main():
     ap.add_argument("--systemui", help="path to a frameworks/base checkout")
     ap.add_argument("--launcher", help="path to a Launcher3 checkout")
     ap.add_argument("--ime", help="path to a LatinIME checkout")
+    ap.add_argument("--settings", help="path to a Settings checkout")
     ap.add_argument("--strict-redundant", action="store_true",
                     help="treat an override equal to stock as a failure")
     args = ap.parse_args()
 
-    trees = {"systemui": args.systemui, "launcher": args.launcher, "ime": args.ime}
+    trees = {"systemui": args.systemui, "launcher": args.launcher,
+             "ime": args.ime, "settings": args.settings}
     failed = 0
     checked = 0
     skipped = []
 
-    for overlay, (tree_key, res_dirs) in sorted(OVERLAYS.items()):
+    for overlay, sources in sorted(OVERLAYS.items()):
         odir = os.path.join(args.overlay_root, overlay)
         if not os.path.isdir(odir):
             continue
@@ -230,28 +243,53 @@ def main():
             print(f"  FAIL  {manifest}: {e}")
             failed += 1
 
-        tree = trees.get(tree_key)
-        if not tree:
-            skipped.append(f"{overlay} (pass --{tree_key} to check its resources)")
-            continue
-        if not os.path.isdir(tree):
-            print(f"  FAIL  target tree not found: {tree}")
-            failed += 1
+        resolved = []
+        missing_tree = None
+        for tree_key, res_dirs in sources:
+            tree = trees.get(tree_key)
+            if not tree:
+                missing_tree = tree_key
+                break
+            if not os.path.isdir(tree):
+                print(f"  FAIL  target tree not found: {tree}")
+                failed += 1
+                missing_tree = tree_key
+                break
+            resolved.append((tree, res_dirs))
+        if missing_tree is not None:
+            if trees.get(missing_tree) is None:
+                skipped.append(
+                    f"{overlay} (pass --{missing_tree} to check its resources)")
             continue
 
-        stock = scan_tree(tree, res_dirs)
+        stock = {}
+        for tree, res_dirs in resolved:
+            for k, v in scan_tree(tree, res_dirs).items():
+                stock.setdefault(k, v)
+
+        # Whether a resource EXISTS does not depend on qualifiers: one name is
+        # one resource ID, however many configurations define values for it.
+        # SettingsLib, for instance, declares its surface colours only under
+        # values-v31 and values-v36, and an overlay quite correctly declares
+        # them under plain values and values-night. Matching qualifiers for the
+        # existence check reported every one of those as missing.
+        stock_names = {name for _, name in stock}
         missing, redundant, provided = [], [], []
         for (qualifier, name), (tag, value) in sorted(declared.items()):
             checked += 1
             if name in PATCH_PROVIDED:
                 provided.append((name, PATCH_PROVIDED[name]))
                 continue
-            # A night-qualified override may legitimately rely on the default
-            # values/ definition existing, so accept either.
-            hit = stock.get((qualifier, name)) or stock.get(("values", name))
-            if hit is None:
+            if name not in stock_names:
                 missing.append((qualifier, name))
-            elif hit[1] == value:
+                continue
+            # Redundancy, unlike existence, IS qualifier-sensitive: an override
+            # only duplicates stock if it duplicates the value stock resolves to
+            # in the same configuration. Compared against the matching
+            # qualifier, or the unqualified default, and otherwise left alone
+            # rather than guessed at.
+            hit = stock.get((qualifier, name)) or stock.get(("values", name))
+            if hit is not None and hit[1] == value:
                 redundant.append((name, value))
 
         if missing:
@@ -270,7 +308,9 @@ def main():
         # file, so the only way to get it wrong is to name one the target does
         # not have -- in which case it is simply dead weight in the APK.
         if drawables:
-            stock_drawables = scan_drawables(tree, res_dirs)
+            stock_drawables = set()
+            for tree, res_dirs in resolved:
+                stock_drawables |= scan_drawables(tree, res_dirs)
             absent = sorted(n for n in drawables if n not in stock_drawables)
             checked += len(drawables)
             if absent:
@@ -285,7 +325,10 @@ def main():
         # (4) styles. This is the one that can break things silently, because
         # the overlay's bag replaces the target's rather than merging into it.
         if styles:
-            stock_styles = scan_styles(tree, res_dirs)
+            stock_styles = {}
+            for tree, res_dirs in resolved:
+                for k, v in scan_styles(tree, res_dirs).items():
+                    stock_styles.setdefault(k, v)
             style_failed = 0
             for name, (parent, items) in sorted(styles.items()):
                 checked += 1

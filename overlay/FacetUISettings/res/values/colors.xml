@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Light theme. Opaque on purpose: these are view backgrounds inside the
+     app's window, so there is nothing behind them to blur and translucency
+     would only let the list scroll visibly through its own header.
+
+     The values sit on FacetUI's cool blue-violet axis rather than the neutral
+     greys stock uses, so Settings shares a palette with the shade above it and
+     the icons on the homescreen behind it.
+-->
+<resources>
+    <!-- The collapsing toolbar header - the large title area at the top of
+         every Settings page, and the closest thing the app has to a menu bar.
+         Stock: @android:color/system_neutral1_100, a warm-neutral grey. -->
+    <color name="settingslib_colorSurfaceHeader">#EEF1F7FC</color>
+
+    <!-- The main surface behind preference lists.
+         Stock: @color/settingslib_surface_light. -->
+    <color name="settingslib_colorSurface">#FFFAFBFE</color>
+
+    <!-- Raised surfaces: switch bars, selected rows, inline cards.
+         Stock: @android:color/system_neutral2_100. -->
+    <color name="settingslib_colorSurfaceVariant">#FFE7ECF6</color>
+
+    <!-- Settings' own dialogs. Tinted to match the framework glass dialogs
+         rather than made translucent: these are AppCompat dialogs, which do
+         not inherit the platform blur, so translucency here would be a tinted
+         window with nothing behind it.
+         Stock: @color/settingslib_surface_light on v31,
+         @color/settingslib_materialColorSurfaceContainerHigh on v36. -->
+    <color name="settingslib_dialog_background">#FFF4F7FC</color>
+</resources>

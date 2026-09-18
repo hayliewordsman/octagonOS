@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     FacetUI - Settings.
+
+     The first of the per-app overlays, and the one that sets the pattern for
+     the rest.
+
+     WHAT THIS DOES, AND WHAT IT DELIBERATELY DOES NOT
+
+     It aligns Settings' own surfaces with FacetUI's palette, so the app reads
+     as part of the system rather than as a separate piece of Material sitting
+     inside it.
+
+     It does NOT make those surfaces glass, and that is not an oversight. An
+     app's headers, cards and list backgrounds are VIEWS inside the app's single
+     window, and Android has no backdrop blur for a view: a view can blur its
+     own content, not what is painted beneath it in the same window. Only
+     windows can blur what is behind them, which is why dialogs, menus and the
+     keyboard could be made glass and an app bar cannot.
+
+     Settings' own dialogs are AppCompat, bundled into the APK rather than
+     inherited from the platform, so the framework dialog glass does not reach
+     them either. Overriding a bundled AppCompat theme would mean restating
+     every item it declares, and its source is not in the tree - it cannot be
+     read, so it cannot be restated safely, so it is left alone. Colour-only is
+     the honest ceiling here.
+
+     Resources named below come from two places that both compile into this
+     APK: Settings' own res, and SettingsLib, which lives in frameworks/base.
+     tools/validate-overlays.py checks both.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.octagonos.facetui.settings">
+    <application android:hasCode="false" />
+    <overlay
+        android:targetPackage="com.android.settings"
+        android:isStatic="true"
+        android:priority="900" />
+</manifest>

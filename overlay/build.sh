@@ -25,7 +25,7 @@ cd "$(dirname "$0")"
 OUT="${OUT:-$(pwd)/out}"
 mkdir -p "$OUT"
 
-for ov in FacetUISystemUI FacetUIFramework FacetUILauncher FacetUIIME; do
+for ov in FacetUISystemUI FacetUIFramework FacetUILauncher FacetUIIME FacetUISettings; do
   echo "[*] $ov"
   aapt2 compile --dir "$ov/res" -o "$OUT/$ov-res.zip"
   aapt2 link -I "$ANDROID_JAR" \
