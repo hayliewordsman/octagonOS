@@ -10,6 +10,11 @@ edition and by the desktop one; this directory is the Android half.
 
 *The boot animation, rendered by evaluating FacetUI's own shader maths.*
 
+![The FacetUI surfaces: notification shade, dialog and popup menu](docs/preview/facetui-surfaces.png)
+
+*The shade, a dialog and a menu, drawn from the radii and alphas the overlays
+actually ship. Renders the maths, not a device.*
+
 ![The FacetUI icon set](docs/preview/facetui-icons.png)
 
 *App icons, from the same maths. Every app gets these, not just the ones drawn
@@ -29,6 +34,7 @@ including everything that has not, is in **[docs/status.md](docs/status.md)**.
 | RRO overlays (8) | **Build and sign.** `aapt2` + `apksigner`, signatures verified |
 | Icon engine patch | **Applies cleanly** to a pristine icon-loader tree. Never compiled |
 | Popup glass patch | **Applies cleanly**, alone and alongside the SystemUI three. Never compiled |
+| Surface fallback patch | **Applies cleanly.** Surfaces go opaque when blur is unavailable or high contrast is on |
 | Icon pack | **Generated, verified, and built.** 22 icons, 40 components, 240 KB APK |
 | Form-factor detection | **7/7 tests pass**, against synthetic bitmasks |
 | Overlay enablement | **Declarative**, via a product `OverlayConfig`. No boot service, no SELinux policy |
@@ -121,7 +127,7 @@ arithmetic.
 | [`patches/`](patches/) | Source patches for what resources cannot express |
 | [`product/`](product/) | Product makefile, and the overlay config that enables FacetUI at boot |
 | [`tools/`](tools/) | Verifiers — boot animation, overlays, icon pack, form-factor detection |
-| [`docs/`](docs/) | [status](docs/status.md) · [FacetUI](docs/facetui.md) · [icons](docs/icons.md) · [app coverage](docs/app-coverage.md) · [building](docs/building.md) · [boot animation](docs/bootanimation.md) · [keyboards and slabs](docs/keyboards-and-slabs.md) |
+| [`docs/`](docs/) | [status](docs/status.md) · [FacetUI](docs/facetui.md) · [icons](docs/icons.md) · [app coverage](docs/app-coverage.md) · [blur profiles](docs/blur-profiles.md) · [distribution](docs/distribution.md) · [building](docs/building.md) · [boot animation](docs/bootanimation.md) · [keyboards and slabs](docs/keyboards-and-slabs.md) |
 
 ## Quick start
 

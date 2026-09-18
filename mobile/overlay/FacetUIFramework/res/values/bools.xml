@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- FacetUI: stop being translucent when there is no blur to show through.
+
+         Battery saver and the developer option "disable blurs" both switch
+         cross-window blur off, and some GPUs never had it. In that state a
+         panel at 77% over unblurred, scrolling content is HARDER to read than
+         an opaque one - the design has quietly become worse than no design.
+
+         With this on, a surface that asked for background blur and did not get
+         it composites over an opaque layer of its own colour instead. Tint and
+         corners are kept; only the transparency goes.
+
+         It also solidifies when high contrast text is enabled, which is the
+         nearest thing Android has to a reduce-transparency setting - and means
+         the existing "disable blurs" toggle doubles as one.
+
+         Stock is false. Needs patches/framework/0002. -->
+    <bool name="facetui_solidify_when_no_blur">true</bool>
+</resources>

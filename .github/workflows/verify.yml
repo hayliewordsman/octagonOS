@@ -1,0 +1,124 @@
+name: verify
+
+# Everything here runs without an Android SDK checkout, a device or an
+# emulator. The point is that the checks which caught real bugs in this
+# repository keep running, rather than depending on someone remembering to.
+#
+# What CI can and cannot do is the same split as everywhere else in this
+# project: it verifies, it does not prove. No image is built and nothing boots.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  shaders:
+    name: AGSL compiles, and the maths still agrees
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      # skia-python will not even import without these.
+      - run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1
+      - run: pip install skia-python numpy pillow
+      - run: mobile/tools/validate-shaders.py
+
+  artifacts:
+    name: Boot animation and icon pack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install numpy pillow
+      # Rebuild rather than trusting what is committed: a generator change that
+      # nobody re-ran is exactly the drift this is for.
+      - run: mobile/bootanimation/build.sh
+      - run: SKIP_APK=1 mobile/iconpack/build.sh
+      - name: the committed boot animation is what the generator produces
+        run: git diff --exit-code --stat mobile/bootanimation/out mobile/iconpack/FacetUIIcons
+
+  formfactor:
+    name: Form-factor detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: mobile/tools/test-formfactor-detect.sh
+
+  overlays:
+    name: Overlays link, and their targets have the resources
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+
+      # Sparse clones: only res/ is needed, and a full checkout of these is
+      # gigabytes for a few hundred XML files.
+      - name: Fetch the target trees
+        run: |
+          set -eux
+          sparse() {
+            git clone --quiet --depth 1 --filter=blob:none --sparse \
+              -b lineage-24.0 "https://github.com/LineageOS/$1" "$2"
+            git -C "$2" sparse-checkout set "${3:-res}"
+          }
+          sparse android_frameworks_base            ../fwb   "core/res/res packages/SystemUI/res packages/SettingsLib"
+          sparse android_packages_apps_Launcher3    ../l3
+          sparse android_packages_inputmethods_LatinIME ../ime  java/res
+          sparse android_packages_apps_Settings     ../settings
+          mkdir -p ../apps
+          for a in DocumentsUI Etar DeskClock; do
+            sparse "android_packages_apps_$a" "../apps/$a" "res app/src/main/res"
+          done
+
+      - name: Resource names exist in their targets
+        run: |
+          mobile/tools/validate-overlays.py \
+            --overlay-root mobile/overlay \
+            --systemui ../fwb --launcher ../l3 --ime ../ime \
+            --settings ../settings --apps ../apps
+
+      # The check above verifies names. Only a linker verifies that references
+      # RESOLVE -- which is how two real bugs got in, and stayed in, until the
+      # first time anyone ran aapt2.
+      - name: Overlays actually link
+        run: |
+          set -eux
+          curl -sSLo bt.zip https://dl.google.com/android/repository/build-tools_r34-linux.zip
+          unzip -q bt.zip -d "$RUNNER_TEMP/bt"
+          curl -sSLo plat.zip https://dl.google.com/android/repository/platform-35_r02.zip
+          unzip -q plat.zip -d "$RUNNER_TEMP/plat"
+          keytool -genkeypair -keystore "$RUNNER_TEMP/ci.jks" -storepass ciciciok \
+            -keyalg RSA -keysize 2048 -validity 10000 -alias ci \
+            -dname "CN=octagonOS CI, O=octagonOS, C=US"
+          export PATH="$RUNNER_TEMP/bt/android-14:$PATH"
+          export ANDROID_JAR="$RUNNER_TEMP/plat/android-35/android.jar"
+          export KEYSTORE="$RUNNER_TEMP/ci.jks" KEYSTORE_PASS=ciciciok
+          mobile/overlay/build.sh
+          mobile/iconpack/build.sh
+
+  patches:
+    name: Patches still apply
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # A patch that stopped applying is the most likely way this repository
+      # rots: upstream moves, and nothing here would notice.
+      - name: Apply every patch to a pristine tree
+        run: |
+          set -eux
+          clone() {
+            git clone --quiet --depth 1 -b lineage-24.0 "https://github.com/LineageOS/$1" "$2"
+          }
+          clone android_frameworks_base ../fwb
+          for p in mobile/patches/systemui/*.patch mobile/patches/framework/*.patch; do
+            git -C ../fwb apply --check "$GITHUB_WORKSPACE/$p"
+            git -C ../fwb apply "$GITHUB_WORKSPACE/$p"
+          done
+          clone android_packages_inputmethods_LatinIME ../ime
+          git -C ../ime apply --check "$GITHUB_WORKSPACE/mobile/patches/ime/0001-facetui-glass-keyboard-window.patch"
+          clone android_frameworks_libs_systemui ../libs
+          git -C ../libs apply --check "$GITHUB_WORKSPACE/mobile/patches/iconloader/0001-facetui-icon-glass.patch"

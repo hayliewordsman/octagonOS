@@ -60,6 +60,7 @@ PATCH_PROVIDED = {
     "facetui_status_bar_notification_icon_mode": "patches/systemui/0003",
     "facetui_keyboard_blur_radius": "patches/ime/0001",
     "facetui_popup_blur_radius": "patches/framework/0001",
+    "facetui_solidify_when_no_blur": "patches/framework/0002",
 }
 
 #: Resources where overriding a dynamic colour with a fixed literal is a
@@ -121,6 +122,28 @@ def parse_values(path):
         text = (el.text or "").strip()
         out[name] = (el.tag, text)
     return out
+
+
+def normalise_parent(parent):
+    """A style parent, stripped to the name both sides can be compared on.
+
+    The target declares a framework parent by bare name, because it IS the
+    framework: `parent="Theme.Material.BaseDialog"`. An overlay is a different
+    package, so the same parent has to be written
+    `@*android:style/Theme.Material.BaseDialog` -- the star because the style is
+    not in public-final.xml, and a namespace because a bare name would resolve
+    against the overlay's own package and fail to link.
+
+    Both spellings mean the same style. Comparing them literally reported a
+    correctly-qualified overlay as moving the style in the hierarchy, which is
+    the opposite of true.
+    """
+    if not parent:
+        return None
+    for prefix in ("@*android:style/", "@android:style/", "@*style/", "@style/"):
+        if parent.startswith(prefix):
+            return parent[len(prefix):]
+    return parent
 
 
 def parse_styles(path):
@@ -327,11 +350,31 @@ def main():
                 missing.append((qualifier, name))
                 continue
             # Redundancy, unlike existence, IS qualifier-sensitive: an override
-            # only duplicates stock if it duplicates the value stock resolves to
-            # in the same configuration. Compared against the matching
-            # qualifier, or the unqualified default, and otherwise left alone
-            # rather than guessed at.
-            hit = stock.get((qualifier, name)) or stock.get(("values", name))
+            # only duplicates stock if it duplicates what stock resolves to in
+            # the SAME configuration. A night override that matches the light
+            # default is not redundant, it is a real change.
+            #
+            # Matching was previously exact -- ("values", name) or nothing --
+            # which silently skipped every resource stock defines only under a
+            # version qualifier. SettingsLib declares its surface colours under
+            # values-v31 and values-v36, so none of those overrides were ever
+            # checked for redundancy at all.
+            #
+            # Now: night matches night, default matches default, and version
+            # qualifiers on the stock side are accepted for either, since an
+            # unqualified override applies at every API level.
+            hit = None
+            want_night = "night" in qualifier
+            for (q, n), v in stock.items():
+                if n != name or ("night" in q) != want_night:
+                    continue
+                # Prefer an exact qualifier match, else take any that agrees on
+                # night-ness -- values-v31 and values-v36 both count.
+                if q == qualifier:
+                    hit = v
+                    break
+                if hit is None:
+                    hit = v
             if hit is not None and hit[1] == value:
                 redundant.append((name, value))
 
@@ -403,7 +446,7 @@ def main():
                     continue
                 stock_parent, stock_items = hit
 
-                if (parent or None) != (stock_parent or None):
+                if normalise_parent(parent) != normalise_parent(stock_parent):
                     print(f"  FAIL  style {name} declares parent "
                           f"{parent!r} but stock has {stock_parent!r} -- "
                           f"the override moves it in the hierarchy")

@@ -1,0 +1,278 @@
+diff --git a/core/java/android/widget/FacetUiPopupGlass.java b/core/java/android/widget/FacetUiPopupGlass.java
+index 200e4c4b7..279584c86 100644
+--- a/core/java/android/widget/FacetUiPopupGlass.java
++++ b/core/java/android/widget/FacetUiPopupGlass.java
+@@ -26,6 +26,7 @@ import android.view.ViewRootImpl;
+ import android.view.WindowManager;
+ 
+ import com.android.internal.R;
++import com.android.internal.policy.FacetUiSurfaceFallback;
+ import com.android.internal.graphics.drawable.BackgroundBlurDrawable;
+ 
+ import java.util.function.Consumer;
+@@ -59,6 +60,7 @@ final class FacetUiPopupGlass implements View.OnAttachStateChangeListener {
+ 
+     private BackgroundBlurDrawable mBlur;
+     private boolean mListenerAttached;
++    private boolean mSolid;
+ 
+     private final Consumer<Boolean> mBlurEnabledListener = this::onBlurEnabledChanged;
+ 
+@@ -128,6 +130,7 @@ final class FacetUiPopupGlass implements View.OnAttachStateChangeListener {
+             mBlur.setCornerRadius(mCornerRadius);
+             // Underneath, so the existing fill and its hairline draw on top.
+             mHost.setBackground(new LayerDrawable(new Drawable[] { mBlur, mOriginal }));
++            mSolid = false;
+         }
+         apply(wm == null || wm.isCrossWindowBlurEnabled());
+     }
+@@ -142,8 +145,9 @@ final class FacetUiPopupGlass implements View.OnAttachStateChangeListener {
+         // The drawable belongs to the ViewRootImpl this popup is leaving, so it
+         // cannot be carried over to the next attach. Dropping it here means the
+         // next one asks its own view root for a fresh one.
+-        if (mBlur != null) {
++        if (mBlur != null || mSolid) {
+             mBlur = null;
++            mSolid = false;
+             mHost.setBackground(mOriginal);
+         }
+     }
+@@ -156,5 +160,22 @@ final class FacetUiPopupGlass implements View.OnAttachStateChangeListener {
+         if (mBlur != null) {
+             mBlur.setBlurRadius(blurEnabled ? mBlurRadius : 0);
+         }
++        // With no blur behind it, a translucent menu is just harder to read
++        // than an opaque one. Same reasoning, and the same helper, as a window
++        // in DecorView.
++        final boolean solid = FacetUiSurfaceFallback.shouldSolidify(
++                mHost.getContext(), mBlurRadius, blurEnabled);
++        if (solid == mSolid) {
++            return;
++        }
++        mSolid = solid;
++        if (solid) {
++            mHost.setBackground(new LayerDrawable(new Drawable[] {
++                    FacetUiSurfaceFallback.backing(mHost.getContext()), mOriginal }));
++        } else if (mBlur != null) {
++            mHost.setBackground(new LayerDrawable(new Drawable[] { mBlur, mOriginal }));
++        } else {
++            mHost.setBackground(mOriginal);
++        }
+     }
+ }
+diff --git a/core/java/com/android/internal/policy/DecorView.java b/core/java/com/android/internal/policy/DecorView.java
+index 020b98d9c..0e393cd7c 100644
+--- a/core/java/com/android/internal/policy/DecorView.java
++++ b/core/java/com/android/internal/policy/DecorView.java
+@@ -268,6 +268,8 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
+     private PendingInsetsController mPendingInsetsController = new PendingInsetsController();
+ 
+     private int mOriginalBackgroundBlurRadius = 0;
++    /** FacetUI: whether the last composition stood in for unavailable glass. */
++    private boolean mLastFacetUiSolid = false;
+     private int mBackgroundBlurRadius = 0;
+     private boolean mCrossWindowBlurEnabled;
+     private final ViewTreeObserver.OnPreDrawListener mBackgroundBlurOnPreDrawListener = () -> {
+@@ -1225,16 +1227,33 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
+             mBackgroundInsets = Insets.NONE;
+         }
+ 
++        // FacetUI: whether this window is currently standing in for glass it
++        // cannot have. Part of the early-out below, because the state changes
++        // without any of the other three changing - battery saver flipping
++        // cross-window blur off does not touch the drawables.
++        final boolean facetUiSolid = FacetUiSurfaceFallback.shouldSolidify(
++                getContext(), mOriginalBackgroundBlurRadius, mCrossWindowBlurEnabled);
++
+         if (mBackgroundInsets.equals(mLastBackgroundInsets)
+                 && mBackgroundBlurDrawable == mLastBackgroundBlurDrawable
+-                && mLastOriginalBackgroundDrawable == mOriginalBackgroundDrawable) {
++                && mLastOriginalBackgroundDrawable == mOriginalBackgroundDrawable
++                && facetUiSolid == mLastFacetUiSolid) {
+             return;
+         }
++        mLastFacetUiSolid = facetUiSolid;
+ 
+         Drawable destDrawable = mOriginalBackgroundDrawable;
+         if (mBackgroundBlurDrawable != null) {
+             destDrawable = new LayerDrawable(new Drawable[] {mBackgroundBlurDrawable,
+                                                              mOriginalBackgroundDrawable});
++        } else if (facetUiSolid && mOriginalBackgroundDrawable != null) {
++            // FacetUI: no blur to show through, so stop being translucent. The
++            // opaque layer goes UNDER the window's own background, which keeps
++            // its tint and its corners and simply composites over something
++            // solid instead of over the app.
++            destDrawable = new LayerDrawable(new Drawable[] {
++                    FacetUiSurfaceFallback.backing(getContext()),
++                    mOriginalBackgroundDrawable});
+         }
+ 
+         if (destDrawable != null && !mBackgroundInsets.equals(Insets.NONE)) {
+@@ -1315,6 +1334,10 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
+             updateBackgroundBlurRadius();
+             removeBackgroundBlurDrawable();
+         }
++        // FacetUI: blur availability decides whether this window is solid, and
++        // removeBackgroundBlurDrawable is not reached on every path that
++        // changes it.
++        updateBackgroundDrawable();
+     }
+ 
+     void removeBackgroundBlurDrawable() {
+diff --git a/core/java/com/android/internal/policy/FacetUiSurfaceFallback.java b/core/java/com/android/internal/policy/FacetUiSurfaceFallback.java
+new file mode 100644
+index 000000000..7a7fbdd50
+--- /dev/null
++++ b/core/java/com/android/internal/policy/FacetUiSurfaceFallback.java
+@@ -0,0 +1,123 @@
++/*
++ * Copyright (C) 2026 The octagonOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.android.internal.policy;
++
++import android.content.Context;
++import android.graphics.Color;
++import android.graphics.drawable.ColorDrawable;
++import android.graphics.drawable.Drawable;
++import android.provider.Settings;
++import android.util.TypedValue;
++
++import com.android.internal.R;
++
++/**
++ * What a FacetUI surface does when it cannot be glass.
++ *
++ * Every FacetUI surface is translucent so that the blur behind it shows
++ * through. When the blur is not there, the translucency is left doing nothing
++ * useful and a good deal of harm: a panel at 77% over unblurred, scrolling
++ * content is harder to read than an opaque one, and the design has quietly
++ * become worse than no design.
++ *
++ * Blur goes away for ordinary reasons, on devices nobody here has tested:
++ *
++ *   battery saver turns cross-window blur off
++ *   the developer option "disable blurs" turns it off
++ *   a GPU that cannot afford it never had it
++ *
++ * So this is not an edge case to note in a document; it is a state real users
++ * will sit in for hours. The answer is to stop being translucent: an opaque
++ * backing layer goes underneath the surface's own background, which then
++ * composites over it. The tint stays, the legibility comes back, and nothing
++ * above this has to know.
++ *
++ * ACCESSIBILITY
++ *
++ * The same path serves high contrast text. Android has no "reduce
++ * transparency" setting, but a user who has asked for high contrast has said
++ * as clearly as the platform allows that they want legibility over effect, and
++ * translucent panels are the opposite of that. When it is on, surfaces
++ * solidify whether or not blur is available.
++ *
++ * That also means the existing, user-facing "disable blurs" toggle doubles as a
++ * reduce-transparency control, which is worth more than a setting only
++ * octagonOS knows about.
++ *
++ * Off unless asked for: R.bool.facetui_solidify_when_no_blur is false in the
++ * platform.
++ */
++public final class FacetUiSurfaceFallback {
++
++    private FacetUiSurfaceFallback() {}
++
++    /**
++     * Whether a surface that wanted glass should go opaque instead.
++     *
++     * @param requestedBlur the radius the surface's theme asked for. Zero means
++     *        the surface never wanted glass, and must be left alone -- a
++     *        genuinely transparent window (a wallpaper host, a translucent
++     *        activity) would be ruined by an opaque backing.
++     */
++    public static boolean shouldSolidify(Context context, int requestedBlur,
++            boolean crossWindowBlurEnabled) {
++        if (context == null || requestedBlur <= 0) {
++            return false;
++        }
++        if (!context.getResources().getBoolean(R.bool.facetui_solidify_when_no_blur)) {
++            return false;
++        }
++        return !crossWindowBlurEnabled || isHighContrastText(context);
++    }
++
++    /**
++     * An opaque layer to put underneath a translucent FacetUI background.
++     *
++     * The colour is the surface's own, with alpha forced to opaque, so a
++     * solidified panel keeps the hue it would have had. Taking a fixed colour
++     * here would undo the wallpaper-derived tint the overlays go to some
++     * trouble to preserve.
++     */
++    public static Drawable backing(Context context) {
++        final TypedValue tv = new TypedValue();
++        int colour = Color.BLACK;
++        if (context != null
++                && context.getTheme().resolveAttribute(
++                        android.R.attr.colorBackground, tv, true)) {
++            colour = tv.type >= TypedValue.TYPE_FIRST_COLOR_INT
++                    && tv.type <= TypedValue.TYPE_LAST_COLOR_INT
++                    ? tv.data
++                    : context.getColor(tv.resourceId);
++        }
++        return new ColorDrawable(colour | 0xFF000000);
++    }
++
++    /**
++     * Read from Settings rather than AccessibilityManager on purpose:
++     * isHighContrastTextEnabled() is behind a feature flag, and a surface that
++     * silently stops solidifying because a flag moved is exactly the kind of
++     * failure this class exists to prevent. The Settings key is stable.
++     */
++    private static boolean isHighContrastText(Context context) {
++        try {
++            return Settings.Secure.getInt(context.getContentResolver(),
++                    Settings.Secure.ACCESSIBILITY_HIGH_TEXT_CONTRAST_ENABLED, 0) != 0;
++        } catch (RuntimeException e) {
++            return false;
++        }
++    }
++}
+diff --git a/core/res/res/values/config.xml b/core/res/res/values/config.xml
+index a19202ff1..0f439e367 100644
+--- a/core/res/res/values/config.xml
++++ b/core/res/res/values/config.xml
+@@ -8074,4 +8074,23 @@
+ 
+     <!-- Whether to explicitly disable the Video capability over IWLAN when Wi-Fi Calling is turned off. -->
+     <bool name="config_disable_video_capability_when_wfc_off">false</bool>
++    <!-- FacetUI: what a surface does when it cannot be glass.
++
++         Every FacetUI surface is translucent so the blur behind it shows
++         through. When there is no blur - battery saver, the developer option
++         "disable blurs", or a GPU that cannot afford it - the translucency is
++         left doing nothing useful and a good deal of harm, because a panel at
++         77% over unblurred scrolling content is harder to read than an opaque
++         one.
++
++         With this true, a surface that ASKED for background blur and did not
++         get it composites over an opaque layer of its own colour instead.
++         Surfaces that never wanted blur are untouched, so a genuinely
++         transparent window is not affected.
++
++         It also solidifies when high contrast text is enabled, which is the
++         closest thing Android has to a reduce-transparency setting.
++
++         false is stock behaviour. -->
++    <bool name="facetui_solidify_when_no_blur">false</bool>
+ </resources>

@@ -24,12 +24,14 @@ written in.
 | The glyph bounds check itself | Verified to fail on purpose: regenerating the pack with the pre-fix constants makes it name all fifteen offending glyphs and exit non-zero, while the mask-only check it replaced still passes at 32.4 of 33 |
 | Octagon icon mask | The path is a true regular octagon, checked numerically: all eight sides 41.4214 |
 | Dialog glass | The theme path was read out of `PhoneWindow.generateLayout()` rather than assumed: all three blur attributes are consumed there unconditionally, and no platform theme sets any of them. `Theme.Material.Dialog` and its Light twin were confirmed empty in the platform, so overriding them risks losing nothing |
+| Surface fallback patch | `git apply --check` passes; all five `frameworks/base` patches apply in sequence. Every API verified present, including `Settings.Secure.ACCESSIBILITY_HIGH_TEXT_CONTRAST_ENABLED` after `isHighContrastTextEnabled()` turned out to be `@FlaggedApi`-gated |
 | Popup glass patch | `git apply --check` passes on a pristine `frameworks/base`, both alone and after the three SystemUI patches. Every API it calls verified present with the signature used, including both `addCrossWindowBlurEnabledListener` overloads |
 | The popup limitation | Checked rather than assumed: `Dialog` builds a `PhoneWindow`, and `PopupWindow` contains no blur API at all. That is why menus needed `patches/framework/0001` rather than an overlay entry |
 | Style and drawable overrides | `validate-overlays.py` now covers both. All three new failure modes verified to fail on purpose: a dropped style item (named all 20), a changed parent, and a drawable absent from the target |
 | Every symbol the patches introduce | Checked to be imported or declared, including `Icon.createWithResource(String, int)` being the public overload and not the one marked "Do not use", and `isAmbient`/`notifKey` existing on `ActiveNotificationIconModel` |
 | Overlay resources | `tools/validate-overlays.py` passes: every overridden resource exists in its target tree, with the patch-provided ones exempted by name |
 | Overlays and icon pack, linked | **Built with `aapt2`, signed with `apksigner`, signatures verified.** Building found two real bugs a name check cannot see: framework attributes used unqualified, and a private framework parent style referenced without the `@*android:` form. Both would have failed for anyone who tried to build |
+| Surfaces, rendered | `tools/render-surfaces.py` draws the shade, a dialog and a menu from the shipped radii and alphas. Rendering them together caught a fidelity bug in the renderer itself: it lit every panel, when `ScrimView` draws the specular edge on the shade scrim alone |
 | Form-factor detection | `tools/test-formfactor-detect.sh` passes 7 cases, including a bitmask whose top bit is set and therefore wraps negative in 64-bit shell arithmetic |
 | **The AGSL, compiled** | **Both shaders compile** under Skia's own SkSL compiler, via `tools/validate-shaders.py`. The compiler was first proven awake on five deliberately broken shaders -- undeclared variable, type mismatch, missing `main`, syntax error, wrong `main` signature -- all rejected, and a valid one accepted |
 | FacetUI constants, everywhere | The same tool checks that `facet_math.py` still matches the AGSL's own literals, and that the four parameter values agree across the shader defaults, `ScrimView` and both generators. Verified to fail on purpose by drifting one of each |
@@ -45,7 +47,8 @@ written in.
 | ~~The icon pack, built~~ | **Builds and signs.** 240 KB |
 | Whether icons actually look right on a device | The preview renders the adaptive icon's own group transform, so it should match -- but it is Pillow's rasteriser, not Android's. Thin strokes and the `evenOdd` fill are where the two are most likely to disagree |
 | Whether the overlays take effect | Now declared in `/product/overlay/config/config.xml`, which `OverlayConfigParser` reads at boot — the attribute handling was read out of that parser rather than assumed. Still never run |
-| The cost of blur-behind on dialogs | `windowBlurBehindEnabled` blurs the entire screen behind every dialog. That is the most expensive thing FacetUI asks for, and on an unmeasured GPU it is the first candidate to turn off |
+| The cost of blur-behind on dialogs | `windowBlurBehindEnabled` blurs the entire screen behind every dialog — the most expensive thing FacetUI asks for. Nothing has been profiled; [blur-profiles.md](blur-profiles.md) is the order to turn things down in when it is |
+| The fallback path, on a device | The solidify path is the answer to blur being off, and it has never run. If it is wrong, the symptom appears only in battery saver — the state hardest to notice in testing |
 | Whether blur renders acceptably | `ro.surface_flinger.supports_background_blur=1` makes SurfaceFlinger attempt blur. Whether it holds frame rate is a per-device measurement nobody has taken |
 | ~~SELinux for the first-boot service~~ | **Resolved by deletion.** The service needed privilege a Tier 2 image cannot grant. Overlay enablement is now declarative, the IME default belongs to the injection tool, and nothing read the property, so the service had no remaining job |
 | The GSI itself | **No image has been built.** A GSI needs roughly 250-400 GB and many CPU-hours; see [building.md](building.md) |
@@ -96,6 +99,8 @@ re-check:
       profile covers by default
 - [ ] Measure a dialog open with blur-behind on. If it drops frames, drop
       `windowBlurBehindEnabled` first and keep `windowBackgroundBlurRadius`
+- [ ] Profile blur on real hardware, in the order in [blur-profiles.md](blur-profiles.md)
+- [ ] Fill in the release checklist in [distribution.md](distribution.md) before publishing anything
 - [ ] Retune the popup fill alpha once the patch is running: it is currently a
       compromise between the blurred and unblurred cases
 - [ ] Look at the icons on a real launcher at real density. 48dp is much smaller

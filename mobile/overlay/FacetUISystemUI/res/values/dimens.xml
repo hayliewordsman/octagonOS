@@ -58,6 +58,11 @@
     <dimen name="keyguard_shortcuts_blur_radius">24dp</dimen>
     <dimen name="fingerprint_icon_blur_radius">24dp</dimen>
 
+    <!-- The dream (always-on / screensaver) overlay. Stock: 50dp, which is
+         between tiers. Pinned to L4 so the deepest surface in the system is one
+         depth, whether it is the shade or the thing that replaces it. -->
+    <dimen name="dream_overlay_anim_blur_radius">64dp</dimen>
+
     <!-- The notification panel's corner radius. Stock: 32dp. Left alone
          deliberately: FacetUI changes material, not shape. -->
 </resources>
