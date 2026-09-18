@@ -9,7 +9,7 @@ imported by both, so the two cannot drift apart.
 | | | |
 |---|---|---|
 | [**`mobile/`**](mobile/) | An Android 17 GSI, for phones with physical keyboards and for slabs, from one image | **Beta. Verified, never run** |
-| [**`desktop/`**](desktop/) | An Ubuntu-based Linux distribution carrying the same design language | **Started. Boot splash, compositor effect and Plasma style built and run** |
+| [**`desktop/`**](desktop/) | An Ubuntu-based Linux distribution carrying the same design language | **Started. Boot splash, compositor effect, Plasma style and icon theme built and run** |
 | [**`shared/`**](shared/) | The FacetUI core both editions import | — |
 
 ![The octagonOS boot animation](mobile/docs/preview/bootanimation-arc.png)
@@ -28,7 +28,7 @@ The single largest risk was retired late: **both AGSL shaders now compile**
 under Skia's own SkSL compiler, offline. That was the one failure that would
 have surfaced as a blank screen after a multi-hour build.
 
-On the desktop side, three things *have* run. The
+On the desktop side, four things *have* run. The
 [Plymouth boot splash](desktop/plymouth/) was installed against a real
 `plymouthd`, driven with real keystrokes and screenshotted — including the
 encrypted-disk passphrase path, which is the part of a boot theme that ruins a

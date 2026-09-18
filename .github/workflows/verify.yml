@@ -263,3 +263,44 @@ jobs:
       # Rendered but not diffed, for the reason given in the kwin-shader job:
       # the preview draws text, so its pixels depend on the fonts installed.
       - run: desktop/tools/render-plasma-surfaces.py --out /tmp/plasma.png
+
+  icon-theme:
+    name: The icon theme, resolved by Qt and validated by GTK
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install numpy pillow cairosvg
+
+      # Qt for the resolver, a real icon theme to inherit from, and GTK's
+      # cache builder, which is also its validator.
+      - name: Qt, Breeze and GTK's icon tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            qt6-base-dev cmake g++ gtk-update-icon-cache breeze-icon-theme \
+            hicolor-icon-theme
+
+      # Rebuild rather than trusting what is committed.
+      - run: desktop/icons/make-icon-theme.py
+      - name: the committed theme is what the generator produces
+        run: git diff --exit-code --stat desktop/icons/FacetUI
+
+      - run: desktop/tools/verify-icon-theme.py
+
+      # Every name at every size, each compared against the file the theme
+      # ships. The spec says an unresolvable name falls back, so a broken
+      # theme resolves everything perfectly -- to somebody else's icons.
+      - run: desktop/tools/run-icon-theme.sh
+
+      # Rendered but not diffed: the sheet draws text, so its pixels depend on
+      # the fonts installed. Here to catch the renderer crashing.
+      - run: desktop/tools/render-icon-sheet.py --out /tmp/icons.png
+
+      # The tile now lives in shared/, so the Android pack renders from the
+      # same code. If that extraction ever changes what it draws, the pack's
+      # own reproducibility check is where it shows.
+      - run: SKIP_APK=1 mobile/iconpack/build.sh
+      - name: the Android icon pack still renders identically
+        run: git diff --exit-code --stat mobile/iconpack/FacetUIIcons

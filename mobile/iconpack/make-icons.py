@@ -37,34 +37,13 @@ sys.path.insert(0, os.path.join(HERE, "..", "..", "shared"))
 
 from facetui.facet_math import edge_highlight, rim_darkening  # noqa: E402
 from facetui.glyphs import APPS, GLYPHS, FALLBACK_GLYPH  # noqa: E402
-from facetui.palette import (  # noqa: E402
-    ACCENT_A, ACCENT_B, FACETS, FACET_HALF_ANGLE, FACET_TILT, LIGHT_ELEVATION,
-    RIM_WIDTH, RIM_AMOUNT, EDGE_INTENSITY,
-)
-
-
-#: Where the light sits on an icon. Fixed, not animated: every icon on the
-#: screen is lit from the same direction, which is what makes a grid of them
-#: read as one surface rather than as a scatter of unrelated buttons.
-ICON_LIGHT_ANGLE = math.radians(-118.0)
-
-AMBIENT = 0.30
-SPECULAR_POWER = 36.0
-SPECULAR_STRENGTH = 0.85
-
-
-#: The flat table is much larger here than on the boot animation's mark (0.46).
-#: There the facets are the subject; here they are a bezel, and the subject is
-#: the glyph sitting on top. Eight facets' worth of value variation running
-#: under a thin glyph at 48dp makes the glyph unreadable, so the crown is
-#: pushed out to a ring and the middle left calm.
-#:
-#: 0.84, not the 0.70 this started at. At 0.70 the table's edge sat at 25.2 and
-#: fifteen of the twenty-five glyphs ran straight over it onto the facets --
-#: the calm centre existed but most glyphs were not inside it. The table and
-#: GLYPH_SCALE below are a pair: they are what decides whether a glyph sits on
-#: calm glass or across a girdle hairline, and neither can be changed alone.
-TABLE_FRAC = 0.84
+# Only the two accents are still needed here, to tint the glyphs. Everything
+# else the tile needs moved to shared/facetui/tile.py, which both editions
+# render from.
+from facetui.palette import ACCENT_A, ACCENT_B  # noqa: E402
+from facetui.tile import TABLE_FRAC  # noqa: E402,F401  (re-exported)
+from facetui.tile import render_tile as _render_glass  # noqa: E402
+from facetui.tile import table_radius as _table_radius  # noqa: E402
 
 #: Android's adaptive icon geometry. The drawable is 108 units square, the mask
 #: covers the middle 72, and the outer 18 on each side is parallax bleed that
@@ -103,113 +82,25 @@ def table_radius():
     """Octagon-distance of the table's edge, in 108-unit viewport space.
 
     The boundary between the calm centre a glyph should sit on and the faceted
-    crown it should not. Exported because tools/verify-iconpack.py checks every
-    glyph against it, and a second copy of the arithmetic there would be free to
-    drift away from this one.
+    crown it should not. Kept as a no-argument function because
+    tools/verify-iconpack.py calls it that way; the arithmetic is shared.
     """
-    apothem = ADAPTIVE_SIZE * (MASK_SIZE / ADAPTIVE_SIZE) * 0.5
-    return apothem * TABLE_FRAC
+    return _table_radius(tile_apothem(ADAPTIVE_SIZE))
 
 
-def facet_lighting(psi):
-    """Diffuse and specular for the eight crown facets, plus the flat table."""
-    phis = np.arange(FACETS) * (2.0 * math.pi / FACETS)
-    normals = np.stack([
-        math.sin(FACET_TILT) * np.cos(phis),
-        math.sin(FACET_TILT) * np.sin(phis),
-        np.full(FACETS, math.cos(FACET_TILT)),
-    ], axis=1)
-    light = np.array([
-        math.cos(psi) * math.sin(LIGHT_ELEVATION),
-        math.sin(psi) * math.sin(LIGHT_ELEVATION),
-        math.cos(LIGHT_ELEVATION),
-    ])
-    half = light + np.array([0.0, 0.0, 1.0])
-    half /= np.linalg.norm(half)
-    return (
-        np.maximum(normals @ light, 0.0),
-        np.maximum(normals @ half, 0.0) ** SPECULAR_POWER,
-        max(float(light[2]), 0.0),
-        max(float(half[2]), 0.0) ** SPECULAR_POWER,
-    )
+def tile_apothem(px):
+    """The octagon's apothem for a `px`-wide adaptive drawable.
+
+    The octagon fills the MASK, not the full drawable: the corners of an
+    adaptive icon are parallax bleed, and a tile drawn out to them would be
+    clipped to a different shape on every launcher.
+    """
+    return px * (MASK_SIZE / ADAPTIVE_SIZE) * 0.5
 
 
 def render_tile(px):
-    """The glass octagon, as an RGBA image `px` wide.
-
-    The same construction as the boot animation's mark -- eight crown facets
-    around a flat table, rim-darkened, with a specular edge -- but lit from a
-    fixed angle and sized to the adaptive-icon mask rather than the screen.
-    """
-    # The octagon fills the mask area, not the full drawable: the corners of an
-    # adaptive icon are bleed, and a tile drawn out to them would be clipped to
-    # a different shape on every launcher.
-    apothem = px * (MASK_SIZE / ADAPTIVE_SIZE) * 0.5
-    cx = cy = px / 2.0
-
-    ys, xs = np.mgrid[0:px, 0:px].astype(np.float32)
-    dx, dy = xs - cx, ys - cy
-
-    phis = np.arange(FACETS) * (2.0 * math.pi / FACETS)
-    dists = np.stack([dx * math.cos(p) + dy * math.sin(p) for p in phis])
-    order = np.argsort(dists, axis=0)
-    facet = order[-1]
-    d_max = np.take_along_axis(dists, order[-1][None], 0)[0]
-    d_second = np.take_along_axis(dists, order[-2][None], 0)[0]
-
-    phi = phis[facet]
-    lateral_px = -dx * np.sin(phi) + dy * np.cos(phi)
-    half_width = np.maximum(d_max, 1e-3) * math.tan(FACET_HALF_ANGLE)
-    lateral = np.clip(lateral_px / half_width, -1.0, 1.0)
-
-    diffuse, specular, table_diff, table_spec = facet_lighting(ICON_LIGHT_ANGLE)
-
-    t = np.arange(FACETS) / (FACETS - 1.0)
-    t = 1.0 - np.abs(t * 2.0 - 1.0)
-    tints = ACCENT_A[None, :] * (1.0 - t[:, None]) + ACCENT_B[None, :] * t[:, None]
-
-    table_r = apothem * TABLE_FRAC
-    inside = d_max <= apothem
-    is_table = inside & (d_max <= table_r)
-    is_crown = inside & ~is_table
-
-    shade = AMBIENT + (1.0 - AMBIENT) * diffuse
-    colour = (tints * shade[:, None] + specular[:, None] * SPECULAR_STRENGTH)[facet]
-
-    span = max(apothem - table_r, 1e-3)
-    along = np.clip((apothem - d_max) / span, 0.0, 1.0)
-    colour = colour * (0.74 + 0.36 * along)[:, :, None]
-    colour = colour * rim_darkening(lateral, RIM_WIDTH, RIM_AMOUNT)[:, :, None]
-
-    table_tint = ACCENT_A * 0.44 + ACCENT_B * 0.56
-    table_lat = np.clip(d_max / max(table_r, 1e-3), 0.0, 1.0)
-    gather = 1.0 - 0.30 * table_lat ** 2
-    table_col = (table_tint[None, None, :]
-                 * (AMBIENT + (1.0 - AMBIENT) * table_diff)
-                 * gather[:, :, None] * 1.40
-                 + table_spec * SPECULAR_STRENGTH * 0.75)
-    table_col = table_col * rim_darkening(
-        table_lat, RIM_WIDTH, RIM_AMOUNT * 0.8)[:, :, None]
-    colour = np.where(is_table[:, :, None], table_col, colour)
-
-    lit = EDGE_INTENSITY * (0.34 + 0.66 * np.clip(specular * 2.4, 0.0, 1.0))
-    colour = colour + edge_highlight(
-        apothem - d_max, apothem * 0.10, lateral, lit[facet])[:, :, None]
-
-    w = max(px / 108.0, 0.7)
-    seam = np.exp(-(( d_max - d_second) / w) ** 2) * 0.34 * is_crown
-    girdle = np.exp(-((d_max - table_r) / (w * 1.3)) ** 2) * 0.30
-    outline = np.exp(-((d_max - apothem) / (w * 1.4)) ** 2) * 0.60
-    colour = colour + (seam + girdle + outline)[:, :, None]
-
-    # Antialias the silhouette: a hard inside/outside test leaves stair-stepped
-    # diagonals, and an octagon is mostly diagonals.
-    alpha = np.clip((apothem - d_max) / max(w, 0.5) + 0.5, 0.0, 1.0)
-    alpha = np.where(inside | (d_max < apothem + w), alpha, 0.0)
-
-    rgb = np.clip(colour, 0.0, 1.0)
-    out = np.dstack([rgb, alpha[:, :, None]])
-    return Image.fromarray((out * 255.0 + 0.5).astype(np.uint8), "RGBA")
+    """The glass octagon, as an RGBA image `px` wide."""
+    return _render_glass(px, tile_apothem(px))
 
 
 # --- vector output ----------------------------------------------------------

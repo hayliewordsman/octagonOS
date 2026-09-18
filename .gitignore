@@ -27,3 +27,6 @@ desktop/kwin/*/build/
 # theme itself is committed; these are evidence for one run.
 desktop/tools/plasma-probe/build/
 desktop/tools/plasma-surfaces.png
+
+# The icon probe's build tree. The theme itself is committed.
+desktop/tools/icon-probe/build/
