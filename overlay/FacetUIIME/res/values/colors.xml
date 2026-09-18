@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Light theme. Only the keyboard *background* is made translucent; every key
+     colour is left on its Material You reference.
+
+     That split is deliberate. Resource XML has no way to apply alpha to a
+     colour reference, so anything made translucent here must be a literal ARGB
+     and stops following the wallpaper palette. Spending that on the background
+     alone buys the whole glass effect - it is the surface the blur shows
+     through - while the keys, which are what the eye actually reads, keep
+     dynamic colour. Making the keys translucent too would cost the palette and
+     hurt legibility for no further depth.
+-->
+<resources>
+    <!-- Stock: @android:color/system_neutral1_50, fully opaque.
+         0xD9 = 85% white: enough to carry key contrast, open enough that the
+         blurred content behind reads as depth rather than noise. -->
+    <color name="keyboard_background_you">#D9F7F9FC</color>
+
+    <!-- The emoji picker sits in the same window and would otherwise be an
+         opaque slab beside a glass keyboard. -->
+    <color name="emoji_tab_page_indicator_background_you">#D9F7F9FC</color>
+</resources>

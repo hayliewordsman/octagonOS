@@ -1,0 +1,152 @@
+diff --git a/packages/SystemUI/res/drawable/facetui_notification_dot.xml b/packages/SystemUI/res/drawable/facetui_notification_dot.xml
+new file mode 100644
+index 000000000..7402faea3
+--- /dev/null
++++ b/packages/SystemUI/res/drawable/facetui_notification_dot.xml
+@@ -0,0 +1,17 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     FacetUI: the neutral notification indicator.
++
++     A plain circle, deliberately carrying no app identity. Solid white so the
++     status bar's existing dark/light tinting applies to it exactly as it does
++     to a real notification icon.
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:pathData="M12,12m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0" />
++</vector>
+diff --git a/packages/SystemUI/res/values/integers.xml b/packages/SystemUI/res/values/integers.xml
+index e8478b9b5..87e9e759c 100644
+--- a/packages/SystemUI/res/values/integers.xml
++++ b/packages/SystemUI/res/values/integers.xml
+@@ -43,4 +43,13 @@
+     <integer name="max_notif_icons_on_lockscreen">3</integer>
+     <!-- Maximum number of notification icons shown in the status bar (excluding overflow dot) -->
+     <integer name="max_notif_static_icons">4</integer>
++
++    <!-- FacetUI: how notification icons appear in the status bar.
++           0 = all icons (stock Android behaviour)
++           1 = alerting only, hiding ambient notifications
++           2 = a single neutral dot when anything is pending
++           3 = hidden entirely
++         Stock behaviour is preserved by default; octagonOS ships 2 via the
++         FacetUISystemUI overlay. -->
++    <integer name="facetui_status_bar_notification_icon_mode">0</integer>
+ </resources>
+\ No newline at end of file
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/notification/icon/ui/viewmodel/NotificationIconContainerStatusBarViewModel.kt b/packages/SystemUI/src/com/android/systemui/statusbar/notification/icon/ui/viewmodel/NotificationIconContainerStatusBarViewModel.kt
+index 0806f4692..e2b1b0922 100644
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/notification/icon/ui/viewmodel/NotificationIconContainerStatusBarViewModel.kt
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/notification/icon/ui/viewmodel/NotificationIconContainerStatusBarViewModel.kt
+@@ -17,6 +17,7 @@ package com.android.systemui.statusbar.notification.icon.ui.viewmodel
+ 
+ import android.content.res.Resources
+ import android.graphics.Rect
++import android.graphics.drawable.Icon
+ import com.android.systemui.dagger.qualifiers.Background
+ import com.android.systemui.dagger.qualifiers.Main
+ import com.android.systemui.dump.DumpManager
+@@ -24,6 +25,7 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
+ import com.android.systemui.plugins.DarkIconDispatcher
+ import com.android.systemui.res.R
+ import com.android.systemui.shade.domain.interactor.ShadeInteractor
++import com.android.systemui.statusbar.notification.icon.domain.interactor.ActiveNotificationIconModel
+ import com.android.systemui.statusbar.notification.icon.domain.interactor.StatusBarNotificationIconsInteractor
+ import com.android.systemui.statusbar.phone.domain.interactor.DarkIconInteractor
+ import com.android.systemui.util.kotlin.FlowDumperImpl
+@@ -51,6 +53,26 @@ constructor(
+ 
+     private val maxIcons = resources.getInteger(R.integer.max_notif_static_icons)
+ 
++    /** FacetUI: see R.integer.facetui_status_bar_notification_icon_mode. */
++    private val facetUiIconMode =
++        resources.getInteger(R.integer.facetui_status_bar_notification_icon_mode)
++
++    /**
++     * FacetUI: the package owning the dot drawable. Read from the Resources
++     * this view model is already given, so mode 2 needs no Context injected
++     * and no package name hardcoded.
++     */
++    private val facetUiDotPackage =
++        resources.getResourcePackageName(R.drawable.facetui_notification_dot)
++
++    /**
++     * FacetUI: the neutral indicator used by mode 2. Built lazily, so a build
++     * running any other mode never resolves the drawable at all.
++     */
++    private val facetUiDot: Icon by lazy {
++        Icon.createWithResource(facetUiDotPackage, R.drawable.facetui_notification_dot)
++    }
++
+     /** Are changes to the icon container animated? */
+     val animationsEnabled: Flow<Boolean> =
+         combine(shadeInteractor.isShadeTouchable, keyguardInteractor.isKeyguardShowing) {
+@@ -76,8 +98,11 @@ constructor(
+     val icons: Flow<NotificationIconsViewData> =
+         iconsInteractor.statusBarNotifs
+             .map { entries ->
++                // FacetUI: filter before mapping, so the icon limit applies to
++                // what survives rather than to the unfiltered set.
++                val filtered = facetUiFilter(entries)
+                 NotificationIconsViewData(
+-                    visibleIcons = entries.mapNotNull { it.toIconInfo(it.statusBarIcon) },
++                    visibleIcons = filtered.first.mapNotNull { it.toIconInfo(filtered.second(it)) },
+                     iconLimit = maxIcons,
+                 )
+             }
+@@ -86,6 +111,49 @@ constructor(
+             .distinctUntilChanged()
+             .dumpWhileCollecting("icons")
+ 
++    /**
++     * FacetUI: applies the configured status bar icon mode.
++     *
++     * Returns the notifications to show, and the icon to show for each. The
++     * icon is returned separately rather than mutated onto the model because
++     * [toIconInfo] already takes it as a parameter, which is what makes mode 2
++     * a substitution rather than a rewrite.
++     *
++     * Mode 2 sorts before taking one. The source is a [Set], so `take(1)` on it
++     * would pick an arbitrary element and the dot could flicker between
++     * notifications on every emission. Sorting by key is not chronological --
++     * [ActiveNotificationIconModel] carries no timestamp on this release -- but
++     * it is stable, which is the property that actually matters here: the dot
++     * is a plain circle either way, so *which* notification backs it is not
++     * observable, only whether it keeps changing.
++     */
++    private fun facetUiFilter(
++        entries: Set<ActiveNotificationIconModel>
++    ): Pair<Collection<ActiveNotificationIconModel>, (ActiveNotificationIconModel) -> Icon?> {
++        return when (facetUiIconMode) {
++            FACETUI_MODE_ALERTING_ONLY ->
++                entries.filterNot { it.isAmbient } to { it: ActiveNotificationIconModel ->
++                    it.statusBarIcon
++                }
++            FACETUI_MODE_NEUTRAL_DOT ->
++                entries.sortedBy { it.notifKey }.take(1) to { _: ActiveNotificationIconModel ->
++                    facetUiDot
++                }
++            FACETUI_MODE_HIDDEN ->
++                emptyList<ActiveNotificationIconModel>() to { _: ActiveNotificationIconModel ->
++                    null
++                }
++            else ->
++                entries to { it: ActiveNotificationIconModel -> it.statusBarIcon }
++        }
++    }
++
++    private companion object {
++        const val FACETUI_MODE_ALERTING_ONLY = 1
++        const val FACETUI_MODE_NEUTRAL_DOT = 2
++        const val FACETUI_MODE_HIDDEN = 3
++    }
++
+     private class IconColorsImpl(override val tint: Int, private val areas: Collection<Rect>) :
+         NotificationIconColors {
+         override fun staticDrawableColor(viewBounds: Rect): Int {

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- FacetUI: how notification icons appear in the status bar.
+
+           0 = all icons (stock Android behaviour)
+           1 = alerting only, hiding silent and ambient notifications
+           2 = a single neutral dot when anything is pending - the default
+           3 = hidden entirely
+
+         Mode 2 says "something is pending" without identifying which app, so a
+         glance at the status bar over your shoulder discloses nothing.
+
+         This resource only exists on a build carrying
+         patches/systemui/0003. On a build without it the overlay entry is
+         simply unused, so shipping it here is harmless either way - which is
+         what lets one overlay serve both a Tier 2 and a Tier 3 image. -->
+    <integer name="facetui_status_bar_notification_icon_mode">2</integer>
+</resources>

@@ -1,0 +1,182 @@
+diff --git a/packages/SystemUI/src/com/android/systemui/facetui/FacetRimShader.kt b/packages/SystemUI/src/com/android/systemui/facetui/FacetRimShader.kt
+new file mode 100644
+index 000000000..4639a48a6
+--- /dev/null
++++ b/packages/SystemUI/src/com/android/systemui/facetui/FacetRimShader.kt
+@@ -0,0 +1,97 @@
++/*
++ * Copyright (C) 2026 The octagonOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.android.systemui.facetui
++
++import android.graphics.RuntimeShader
++
++/**
++ * Darkens a glass surface toward its vertical edges.
++ *
++ * A pane of glass is optically thicker where it curves away, so it absorbs more
++ * light at the rim than through the middle. Reproducing that gives the panel a
++ * defined boundary without drawing a border on it.
++ *
++ * This replaces an earlier refraction shader that displaced sampling at the rim.
++ * That approach was measured and found to be invisible: the scrim's blur kernel
++ * is wider than the displacement gradient, so shifting samples changes nothing
++ * once the content behind is already diffused. The same is true of chromatic
++ * separation. The rule that follows is that on a blurred surface only effects
++ * which *modify values* survive; effects which *displace samples* do not.
++ *
++ * Intended to be chained after the blur, so it darkens diffused content.
++ */
++class FacetRimShader : RuntimeShader(SHADER) {
++
++    /** Width of the darkening band at each vertical edge, in pixels. */
++    var rim: Float = 48f
++        set(value) {
++            field = value
++            setFloatUniform("in_rim", value)
++        }
++
++    /** Peak darkening at the rim, 0..1. At 1.0 the edge goes black. */
++    var amount: Float = 0.35f
++        set(value) {
++            field = value
++            setFloatUniform("in_amount", value)
++        }
++
++    /** Surface size in pixels; the profile is computed against the width. */
++    fun setSize(width: Float, height: Float) {
++        setFloatUniform("in_size", width, height)
++    }
++
++    init {
++        // Self-assignment runs the setters, pushing the defaults into the
++        // shader's uniforms. See FacetEdgeShader for the same pattern.
++        rim = rim
++        amount = amount
++    }
++
++    companion object {
++        /** Name of the input shader uniform, for createRuntimeShaderEffect. */
++        const val INPUT_SHADER_NAME = "in_src"
++
++        private const val UNIFORMS = """
++            uniform shader in_src;
++            uniform vec2 in_size;
++            uniform float in_rim;
++            uniform float in_amount;
++        """
++
++        private const val MAIN = """
++            vec4 main(vec2 p) {
++                float r = max(in_rim, 1.0);
++
++                float dl = p.x / r;
++                float dr = (in_size.x - p.x) / r;
++
++                // Peaks at both vertical edges and falls to nothing across the
++                // middle, so the panel darkens at its rims only.
++                float band = abs(exp(-dl * dl) - exp(-dr * dr));
++
++                vec4 c = in_src.eval(p);
++
++                // Colour is premultiplied, so scaling rgb darkens without
++                // altering coverage. Alpha is deliberately left untouched.
++                return vec4(c.rgb * (1.0 - in_amount * band), c.a);
++            }
++        """
++
++        private const val SHADER = UNIFORMS + MAIN
++    }
++}
+diff --git a/packages/SystemUI/src/com/android/systemui/scrim/ScrimView.java b/packages/SystemUI/src/com/android/systemui/scrim/ScrimView.java
+index 08a1b7f8f..723d9a665 100644
+--- a/packages/SystemUI/src/com/android/systemui/scrim/ScrimView.java
++++ b/packages/SystemUI/src/com/android/systemui/scrim/ScrimView.java
+@@ -45,6 +45,7 @@ import com.android.internal.annotations.GuardedBy;
+ import com.android.internal.annotations.VisibleForTesting;
+ import com.android.internal.colorextraction.ColorExtractor;
+ import com.android.systemui.facetui.FacetEdgeShader;
++import com.android.systemui.facetui.FacetRimShader;
+ import com.android.systemui.shade.TouchLogger;
+ import com.android.systemui.util.LargeScreenUtils;
+ 
+@@ -61,6 +62,10 @@ public class ScrimView extends View {
+     private static final float FACETUI_EDGE_THICKNESS_DP = 12f;
+     /** FacetUI: peak highlight alpha when the scrim is fully opaque. */
+     private static final float FACETUI_EDGE_MAX_INTENSITY = 0.5f;
++    /** FacetUI: width of the darkening band at each vertical edge. */
++    private static final float FACETUI_RIM_DP = 48f;
++    /** FacetUI: peak darkening at the rim. */
++    private static final float FACETUI_RIM_AMOUNT = 0.35f;
+     private static final boolean isDebugLoggable = Build.IS_ENG || Log.isLoggable(TAG,
+             Log.DEBUG);
+ 
+@@ -73,6 +78,7 @@ public class ScrimView extends View {
+     private float mViewAlpha = 1.0f;
+     private Drawable mDrawable;
+     private FacetEdgeShader mFacetEdgeShader;
++    private FacetRimShader mFacetRimShader;
+     private Paint mFacetEdgePaint;
+     private PorterDuffColorFilter mColorFilter;
+     private String mScrimName;
+@@ -418,6 +424,33 @@ public class ScrimView extends View {
+         }
+     }
+ 
++    /**
++     * Chains the FacetUI rim darkening on top of an existing effect.
++     *
++     * The scrim's blur is itself a RenderEffect, so this must be composed with
++     * it rather than assigned over it -- calling setRenderEffect twice would
++     * simply discard the blur, destroying what the whole design depends on
++     * while presenting as "the shader doesn't work". Chaining also orders them
++     * correctly: light is diffused by the body of the glass, then absorbed by
++     * the thicker rim.
++     */
++    private RenderEffect chainFacetRim(RenderEffect blur) {
++        final int width = getWidth();
++        final int height = getHeight();
++        if (width <= 0 || height <= 0) {
++            return blur;
++        }
++        if (mFacetRimShader == null) {
++            mFacetRimShader = new FacetRimShader();
++        }
++        mFacetRimShader.setSize(width, height);
++        mFacetRimShader.setRim(FACETUI_RIM_DP * getResources().getDisplayMetrics().density);
++        mFacetRimShader.setAmount(FACETUI_RIM_AMOUNT);
++        final RenderEffect rim = RenderEffect.createRuntimeShaderEffect(
++                mFacetRimShader, FacetRimShader.INPUT_SHADER_NAME);
++        return RenderEffect.createChainEffect(rim, blur);
++    }
++
+     /**
+      * Blur the view with the specific blur radius or clear any blurs if the radius is 0
+      */
+@@ -425,10 +458,11 @@ public class ScrimView extends View {
+         if (blurRadius > 0) {
+             debugLog("Apply blur RenderEffect to ScrimView " + mScrimName + " for radius "
+                     + blurRadius);
+-            setRenderEffect(RenderEffect.createBlurEffect(
++            final RenderEffect blur = RenderEffect.createBlurEffect(
+                     blurRadius,
+                     blurRadius,
+-                    Shader.TileMode.CLAMP));
++                    Shader.TileMode.CLAMP);
++            setRenderEffect(chainFacetRim(blur));
+         } else {
+             debugLog("Resetting blur RenderEffect to ScrimView " + mScrimName);
+             setRenderEffect(null);

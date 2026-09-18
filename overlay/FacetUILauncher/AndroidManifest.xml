@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     FacetUI - homescreen resource layer for octagonOS.
+
+     Targets Launcher3, which is what LineageOS 24 ships (it replaced Trebuchet;
+     the package name stayed com.android.launcher3 across every build variant,
+     including Launcher3QuickStep).
+
+     The homescreen is the one surface where most of the glass already works
+     without a patch: Launcher3 carries its own depth controller and blurs the
+     wallpaper behind its overlays. What it does not do is blur *enough*, or
+     consistently with the rest of the system. This retunes it onto the FacetUI
+     depth model so a folder and a notification shade read as the same material.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.octagonos.facetui.launcher">
+    <application android:hasCode="false" />
+    <overlay
+        android:targetPackage="com.android.launcher3"
+        android:isStatic="true"
+        android:priority="900" />
+</manifest>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FacetUI depth model, applied to the homescreen. Stock values quoted from
+     Launcher3 on lineage-24.0. -->
+<resources>
+    <!-- L2: folders are small popups over the workspace. Stock: 20dp, which is
+         close but sits between tiers, so a folder and the volume dialog beside
+         it read as slightly different materials. -->
+    <dimen name="folder_blur_radius">24dp</dimen>
+
+    <!-- L2: long-press popups, for the same reason. Stock: 20dp. -->
+    <dimen name="popup_blur_radius">24dp</dimen>
+
+    <!-- L3: the home organizer covers the workspace, so it belongs at shade
+         depth rather than popup depth. Stock: 30dp. -->
+    <dimen name="home_organizer_background_blur_radius">48dp</dimen>
+</resources>

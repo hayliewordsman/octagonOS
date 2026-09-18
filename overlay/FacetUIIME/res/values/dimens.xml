@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Depth of the blur behind the keyboard window. L3 in the FacetUI depth
+         model - the keyboard is a large surface directly over app content, so
+         it takes the same tier as the shade rather than the shallower tier used
+         for small popups.
+
+         This resource only exists on a build carrying patches/ime/0001. On a
+         build without it the entry is unused and the keyboard is translucent
+         but not blurred. -->
+    <dimen name="facetui_keyboard_blur_radius">48dp</dimen>
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Stock is already false on lineage-24.0. Restated because if a base
+         flips it to true - which a vendor targeting weaker hardware plausibly
+         would - the workspace silently stops blurring and the homescreen is
+         the only surface in the system that is not glass, with nothing in the
+         logs to say why. -->
+    <bool name="reduce_workspace_blur_usage">false</bool>
+</resources>

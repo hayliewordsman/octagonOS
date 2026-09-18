@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Stock is false; without it the volume dialog stays flat however large
+         volume_dialog_background_blur_radius is set. -->
+    <bool name="config_volumeDialogUseBackgroundBlur">true</bool>
+
+    <!-- Stock is already true on lineage-24.0. Restated so that a base which
+         disables it does not silently drop the lockscreen and homescreen
+         glass, which both depend on the wallpaper being blurrable. -->
+    <bool name="config_supportBlurredWallpaper">true</bool>
+
+    <!-- Stock is already true. The standalone power menu must stay translucent
+         or the L2 radius above has nothing to sample. -->
+    <bool name="config_translucentStandalonePowerMenu">true</bool>
+</resources>

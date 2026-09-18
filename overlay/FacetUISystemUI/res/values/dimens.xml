@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     The FacetUI depth model.
+
+     Glass reads as depth only if blur is hierarchical: a single radius
+     everywhere looks like frosted plastic. Each tier roughly doubles, because
+     the eye reads the ratio between surfaces rather than absolute radii.
+
+       L0   0dp   opaque - wallpaper, app content
+       L1   8dp   inline chips, inactive QS tiles
+       L2  24dp   volume dialog, power menu, small popups
+       L3  48dp   notification shade content, status bar window
+       L4  64dp   the full shade window, the deepest layer
+
+     Stock values are quoted against lineage-24.0 (Android 17) so drift is
+     visible at a glance. Verified present with those values.
+-->
+<resources>
+    <!-- L1 floor, so even the shallowest surface samples the wallpaper.
+         Stock: 1px, which is indistinguishable from no blur at all. -->
+    <dimen name="min_window_blur_radius">8dp</dimen>
+
+    <!-- L3 ceiling for the status bar window and power menu. Stock: 23px. -->
+    <dimen name="max_window_blur_radius">48dp</dimen>
+
+    <!-- L3: shade content sits at the same depth as its own chrome.
+         Stock: @dimen/max_window_blur_radius, i.e. it inherits. Set it
+         explicitly so the two stay equal even if the ceiling above moves. -->
+    <dimen name="max_shade_content_blur_radius">48dp</dimen>
+
+    <!-- L4: the deepest layer, behind the whole shade. Stock: 34dp. -->
+    <dimen name="max_shade_window_blur_radius">64dp</dimen>
+
+    <!-- L2: stock ships 0dp, which disables the volume dialog blur outright
+         even with config_volumeDialogUseBackgroundBlur on. -->
+    <dimen name="volume_dialog_background_blur_radius">24dp</dimen>
+
+    <!-- L2: the volume dialog's own surface. Stock: 23px, already close;
+         pinned to the tier so it cannot drift away from the dialog blur. -->
+    <dimen name="volume_dialog_background_surface_blur_radius">24dp</dimen>
+
+    <!-- L2: power menu. Stock: 34dp, which puts it between tiers and makes it
+         read as a different material from the volume dialog beside it. -->
+    <dimen name="global_actions_blur_radius">24dp</dimen>
+
+    <!-- L2: bottom sheets. Stock: 30dp. -->
+    <dimen name="bottomsheet_blur_radius">24dp</dimen>
+
+    <!-- Push notifications. Android 17 exposes this as a resource, which
+         Android 16 did not - on 16 a glass notification needed a SystemUI
+         recompile. Stock: 25dp. Raised to L3 so a notification reads as the
+         same material as the shade it sits in. -->
+    <dimen name="notification_background_blur_radius">48dp</dimen>
+
+    <!-- Lockscreen. Also newly resource-exposed on Android 17. Stock: 15dp
+         for both; raised to L2 so the shortcuts and the fingerprint affordance
+         are glass rather than flat tinted circles. -->
+    <dimen name="keyguard_shortcuts_blur_radius">24dp</dimen>
+    <dimen name="fingerprint_icon_blur_radius">24dp</dimen>
+
+    <!-- The notification panel's corner radius. Stock: 32dp. Left alone
+         deliberately: FacetUI changes material, not shape. -->
+</resources>

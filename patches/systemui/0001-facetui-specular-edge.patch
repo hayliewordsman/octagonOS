@@ -1,0 +1,182 @@
+diff --git a/packages/SystemUI/src/com/android/systemui/facetui/FacetEdgeShader.kt b/packages/SystemUI/src/com/android/systemui/facetui/FacetEdgeShader.kt
+new file mode 100644
+index 000000000..8383749f6
+--- /dev/null
++++ b/packages/SystemUI/src/com/android/systemui/facetui/FacetEdgeShader.kt
+@@ -0,0 +1,97 @@
++/*
++ * Copyright (C) 2026 The octagonOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.android.systemui.facetui
++
++import android.graphics.RuntimeShader
++
++/**
++ * Draws a specular highlight along the top edge of a glass surface.
++ *
++ * Blur alone makes a panel look like frosted plastic. What reads as *glass* is
++ * the edge: a bright, narrow band where the surface curves away and catches the
++ * light. This shader produces that band, with a falloff down the panel and a
++ * gentle bias toward the centre so the edge reads as curved rather than flat.
++ *
++ * Follows the pattern SystemUI already uses for `DwellRippleShader`.
++ */
++class FacetEdgeShader : RuntimeShader(SHADER) {
++
++    /** Falloff distance in pixels. Larger is softer and more diffuse. */
++    var thickness: Float = 12f
++        set(value) {
++            field = value
++            setFloatUniform("in_thickness", value)
++        }
++
++    /** Peak alpha of the highlight, 0..1. */
++    var intensity: Float = 0.5f
++        set(value) {
++            field = value
++            setFloatUniform("in_intensity", value)
++        }
++
++    /** Panel size in pixels; the centre bias is computed against the width. */
++    fun setSize(width: Float, height: Float) {
++        setFloatUniform("in_size", width, height)
++    }
++
++    /** Highlight colour, linear 0..1 components. */
++    fun setTint(red: Float, green: Float, blue: Float) {
++        setFloatUniform("in_tint", red, green, blue)
++    }
++
++    init {
++        // Self-assignment is deliberate: it runs the setters above, which is
++        // what pushes the defaults into the shader's uniforms. Without this the
++        // uniforms are undefined until something happens to set them.
++        thickness = thickness
++        intensity = intensity
++        setTint(1f, 1f, 1f)
++    }
++
++    companion object {
++        private const val UNIFORMS = """
++            uniform vec2 in_size;
++            uniform float in_thickness;
++            uniform float in_intensity;
++            uniform vec3 in_tint;
++        """
++
++        private const val MAIN = """
++            vec4 main(vec2 p) {
++                float t = max(in_thickness, 1.0);
++
++                // Falloff from the top edge. Squared so the band stays tight at
++                // its peak and fades quickly, rather than smearing down the panel.
++                float d = p.y / t;
++                float edge = exp(-d * d * 2.0);
++
++                // Bias toward the centre, so the highlight reads as a curved
++                // surface catching light rather than a painted-on stripe.
++                float x = (p.x / max(in_size.x, 1.0)) * 2.0 - 1.0;
++                float arc = max(1.0 - x * x * 0.55, 0.0);
++
++                float a = clamp(edge * arc * in_intensity, 0.0, 1.0);
++
++                // AGSL expects premultiplied alpha.
++                return vec4(in_tint * a, a);
++            }
++        """
++
++        private const val SHADER = UNIFORMS + MAIN
++    }
++}
+diff --git a/packages/SystemUI/src/com/android/systemui/scrim/ScrimView.java b/packages/SystemUI/src/com/android/systemui/scrim/ScrimView.java
+index 5af999ad7..08a1b7f8f 100644
+--- a/packages/SystemUI/src/com/android/systemui/scrim/ScrimView.java
++++ b/packages/SystemUI/src/com/android/systemui/scrim/ScrimView.java
+@@ -23,6 +23,7 @@ import android.content.Context;
+ import android.content.res.Resources;
+ import android.graphics.Canvas;
+ import android.graphics.Color;
++import android.graphics.Paint;
+ import android.graphics.PorterDuff;
+ import android.graphics.PorterDuff.Mode;
+ import android.graphics.PorterDuffColorFilter;
+@@ -43,6 +44,7 @@ import androidx.core.graphics.ColorUtils;
+ import com.android.internal.annotations.GuardedBy;
+ import com.android.internal.annotations.VisibleForTesting;
+ import com.android.internal.colorextraction.ColorExtractor;
++import com.android.systemui.facetui.FacetEdgeShader;
+ import com.android.systemui.shade.TouchLogger;
+ import com.android.systemui.util.LargeScreenUtils;
+ 
+@@ -55,6 +57,10 @@ import java.util.concurrent.Executor;
+  */
+ public class ScrimView extends View {
+     private static final String TAG = "ScrimView";
++    /** FacetUI: falloff distance of the specular edge highlight. */
++    private static final float FACETUI_EDGE_THICKNESS_DP = 12f;
++    /** FacetUI: peak highlight alpha when the scrim is fully opaque. */
++    private static final float FACETUI_EDGE_MAX_INTENSITY = 0.5f;
+     private static final boolean isDebugLoggable = Build.IS_ENG || Log.isLoggable(TAG,
+             Log.DEBUG);
+ 
+@@ -66,6 +72,8 @@ public class ScrimView extends View {
+     private final ColorExtractor.GradientColors mTmpColors = new ColorExtractor.GradientColors();
+     private float mViewAlpha = 1.0f;
+     private Drawable mDrawable;
++    private FacetEdgeShader mFacetEdgeShader;
++    private Paint mFacetEdgePaint;
+     private PorterDuffColorFilter mColorFilter;
+     private String mScrimName;
+     private int mTintColor;
+@@ -121,9 +129,38 @@ public class ScrimView extends View {
+                         LargeScreenUtils.shouldUseLargeScreenShadeHeader(res));
+             }
+             mDrawable.draw(canvas);
++            drawFacetEdge(canvas);
+         }
+     }
+ 
++    /**
++     * Draws the FacetUI specular edge across the top of the scrim, so the panel
++     * reads as a lit glass surface rather than a flat translucent fill. The
++     * highlight tracks the scrim's own alpha, so it fades in and out with the
++     * panel instead of appearing as a detached line.
++     */
++    private void drawFacetEdge(Canvas canvas) {
++        final int width = getWidth();
++        final int height = getHeight();
++        if (width <= 0 || height <= 0) {
++            return;
++        }
++        if (mFacetEdgeShader == null) {
++            mFacetEdgeShader = new FacetEdgeShader();
++            mFacetEdgePaint = new Paint();
++        }
++        final float thickness =
++                FACETUI_EDGE_THICKNESS_DP * getResources().getDisplayMetrics().density;
++        mFacetEdgeShader.setSize(width, height);
++        mFacetEdgeShader.setThickness(thickness);
++        mFacetEdgeShader.setIntensity(
++                (mDrawable.getAlpha() / 255f) * FACETUI_EDGE_MAX_INTENSITY);
++        mFacetEdgePaint.setShader(mFacetEdgeShader);
++        // The shader fades to nothing well before this bound; drawing the full
++        // height would cost fill rate for pixels that are already transparent.
++        canvas.drawRect(0f, 0f, width, thickness * 3f, mFacetEdgePaint);
++    }
++
+     @VisibleForTesting
+     void setDrawable(Drawable drawable) {
+         executeOnExecutor(() -> {

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Launcher3 already defines a glass panel pair and uses it for the widget
+     picker. FacetUI retunes the two to match the shade's tint rather than
+     defining new colours, so the homescreen's glass and SystemUI's glass are
+     the same material rather than two near-misses.
+-->
+<resources>
+    <!-- Stock: #66D9E2FF. Foreground wash over the blurred content. -->
+    <color name="blur_shade_panel_fg">#59D6E3FF</color>
+
+    <!-- Stock: #1AFFFFFF. The hairline-equivalent lift that keeps the panel
+         from dissolving into whatever is behind it. -->
+    <color name="blur_shade_panel_bg">#24FFFFFF</color>
+</resources>

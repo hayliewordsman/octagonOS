@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     FacetUI - virtual keyboard resource layer for octagonOS.
+
+     Targets the AOSP/LineageOS keyboard. Verify the package before shipping
+     against a base that carries a different one - never assume it:
+
+         aapt2 dump packagename <keyboard.apk>
+
+     With no Android SDK to hand, titan2e-eos/tools/axml.py reads the same
+     thing straight out of the binary manifest.
+
+     This half of the glass keyboard supplies the translucency. The blur is a
+     window property and cannot come from a resource, so it comes from
+     patches/ime/0001 instead. Both are needed: translucent without blur is a
+     tinted window, not glass.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.octagonos.facetui.ime">
+    <application android:hasCode="false" />
+    <overlay
+        android:targetPackage="com.android.inputmethod.latin"
+        android:isStatic="true"
+        android:priority="900" />
+</manifest>

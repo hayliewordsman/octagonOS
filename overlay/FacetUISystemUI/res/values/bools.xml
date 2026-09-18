@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Stock is false, which makes the shade scrim opaque. With it opaque
+         every blur radius above is wasted work: there is nothing to see
+         through. This single bool is the difference between a glass shade and
+         a grey one. -->
+    <bool name="notification_scrim_transparent">true</bool>
+</resources>

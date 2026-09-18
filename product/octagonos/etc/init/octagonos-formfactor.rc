@@ -1,0 +1,29 @@
+# octagonOS form-factor setup.
+#
+# Runs once, after the package manager and the overlay service are up -- the
+# script enables overlays and may set a default IME, and both need a running
+# system_server. `class_start` is too early for that, so this hangs off
+# sys.boot_completed instead.
+#
+# oneshot plus the script's own stamp file: init will not restart it, and even
+# if something does, the script exits immediately on a second run.
+
+# SELinux: this service is deliberately given no explicit seclabel. The obvious
+# choice, u:r:su:s0, only exists on userdebug and eng builds -- on a user build
+# it does not resolve and init refuses to start the service, which is exactly
+# the kind of failure that shows up only after you have shipped.
+#
+# With no seclabel, init runs the service in the domain the executable's file
+# context maps to. On an enforcing build that domain will not hold the
+# permissions this script needs (setprop on persist.octagonos.*, calling `cmd
+# overlay` and `ime`), so a proper domain and policy are still owed before this
+# can work on an enforcing image. Untested on a device -- see docs/status.md.
+service octagonos-formfactor /system/bin/octagonos-formfactor.sh
+    class late_start
+    user root
+    group root shell
+    disabled
+    oneshot
+
+on property:sys.boot_completed=1
+    start octagonos-formfactor

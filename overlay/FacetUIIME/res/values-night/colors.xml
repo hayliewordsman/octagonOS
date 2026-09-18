@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Dark theme. Lower alpha than the light theme: a dark translucent surface
+     over dark content needs to be more open to read as glass at all, whereas a
+     light one is already distinct from most content behind it.
+-->
+<resources>
+    <!-- Stock: @android:color/system_surface_container_dark, fully opaque. -->
+    <color name="keyboard_background_you">#C41B1E24</color>
+    <color name="emoji_tab_page_indicator_background_you">#C41B1E24</color>
+</resources>

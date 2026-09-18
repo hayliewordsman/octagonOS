@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Quality/cost tradeoff for SurfaceFlinger's blur. Stock on
+         lineage-24.0 is true, which selects the cheaper, lower-quality path.
+
+         Left at true deliberately. octagonOS is a GSI: it boots on hardware
+         nobody has measured, including devices considerably weaker than the
+         one this was designed against. Flipping it to false raises quality and
+         cost together, and a blur that drops frames is worse than a blur that
+         is slightly soft. Flip it per-device once you have numbers, not
+         before. -->
+    <bool name="config_sf_slowBlur">true</bool>
+</resources>

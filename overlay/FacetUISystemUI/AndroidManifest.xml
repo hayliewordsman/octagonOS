@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     FacetUI - SystemUI resource layer for octagonOS.
+
+     Everything here is a bool, dimen, color or integer that SystemUI already
+     reads. None of it needs a recompile: the glass comes from turning on
+     machinery Android already ships, configured conservatively by default.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.octagonos.facetui.systemui">
+    <application android:hasCode="false" />
+    <overlay
+        android:targetPackage="com.android.systemui"
+        android:isStatic="true"
+        android:priority="900" />
+</manifest>

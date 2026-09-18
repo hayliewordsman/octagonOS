@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     FacetUI - framework resource layer for octagonOS.
+
+     Targets the `android` package. This is where SurfaceFlinger's own blur
+     behaviour lives, as distinct from SystemUI's use of it.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.octagonos.facetui.framework">
+    <application android:hasCode="false" />
+    <overlay
+        android:targetPackage="android"
+        android:isStatic="true"
+        android:priority="900" />
+</manifest>

@@ -1,0 +1,168 @@
+diff --git a/java/res/values/facetui.xml b/java/res/values/facetui.xml
+new file mode 100644
+index 0000000..033f5c9
+--- /dev/null
++++ b/java/res/values/facetui.xml
+@@ -0,0 +1,14 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     FacetUI keyboard glass.
++
++     This is a dimen rather than a constant so the FacetUIIME overlay can retune
++     it per device without another build -- the same reason the rest of the
++     depth model lives in resources.
++-->
++<resources>
++    <!-- L3 in the FacetUI depth model. The keyboard is a large surface sitting
++         directly over app content, so it takes the same depth as the shade
++         rather than the shallower tier used for small popups. -->
++    <dimen name="facetui_keyboard_blur_radius">48dp</dimen>
++</resources>
+diff --git a/java/src/com/android/inputmethod/latin/LatinIME.java b/java/src/com/android/inputmethod/latin/LatinIME.java
+index b6351a5..e080a0c 100644
+--- a/java/src/com/android/inputmethod/latin/LatinIME.java
++++ b/java/src/com/android/inputmethod/latin/LatinIME.java
+@@ -83,6 +83,7 @@ import com.android.inputmethod.latin.common.Constants;
+ import com.android.inputmethod.latin.common.CoordinateUtils;
+ import com.android.inputmethod.latin.common.InputPointers;
+ import com.android.inputmethod.latin.define.DebugFlags;
++import com.android.inputmethod.latin.facetui.FacetUiWindowGlass;
+ import com.android.inputmethod.latin.define.ProductionFlags;
+ import com.android.inputmethod.latin.inputlogic.InputLogic;
+ import com.android.inputmethod.latin.permissions.PermissionsManager;
+@@ -170,6 +171,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
+     private RichInputMethodManager mRichImm;
+     @UsedForTesting final KeyboardSwitcher mKeyboardSwitcher;
+     private final SubtypeState mSubtypeState = new SubtypeState();
++    /** FacetUI: blurs what is behind the keyboard window. */
++    private final FacetUiWindowGlass mFacetUiWindowGlass = new FacetUiWindowGlass(this);
+     private EmojiAltPhysicalKeyDetector mEmojiAltPhysicalKeyDetector;
+     private StatsUtilsManager mStatsUtilsManager;
+     // Working variable for {@link #startShowingInputView()} and
+@@ -777,6 +780,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
+ 
+     @Override
+     public void onDestroy() {
++        mFacetUiWindowGlass.detach();
+         mDictionaryFacilitator.closeDictionaries();
+         mSettings.onDestroy();
+         unregisterReceiver(mHideSoftInputReceiver);
+@@ -1117,6 +1121,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
+     public void onWindowShown() {
+         super.onWindowShown();
+         updateNavigationBarColor();
++        // FacetUI: blur what is behind the keyboard. Applied on every show
++        // rather than once at creation, because the window is recreated across
++        // configuration changes and a radius set on the old one is lost.
++        mFacetUiWindowGlass.attach(getWindow().getWindow());
+     }
+ 
+     @Override
+diff --git a/java/src/com/android/inputmethod/latin/facetui/FacetUiWindowGlass.java b/java/src/com/android/inputmethod/latin/facetui/FacetUiWindowGlass.java
+new file mode 100644
+index 0000000..4afd7b5
+--- /dev/null
++++ b/java/src/com/android/inputmethod/latin/facetui/FacetUiWindowGlass.java
+@@ -0,0 +1,102 @@
++/*
++ * Copyright (C) 2026 The octagonOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.android.inputmethod.latin.facetui;
++
++import android.content.Context;
++import android.view.Window;
++import android.view.WindowManager;
++
++import com.android.inputmethod.latin.R;
++
++/**
++ * Makes the keyboard window a FacetUI glass surface.
++ *
++ * A translucent keyboard is not a glass keyboard. Colours alone -- which is all
++ * an RRO overlay can change -- let the app behind show through unmodified, which
++ * reads as a tinted window, not as a pane above the content. What separates the
++ * two is blurring what is behind, and that is a window property, so it cannot be
++ * delivered by a resource. Hence this.
++ *
++ * Two things must both be true or the effect does not appear:
++ *
++ *   1. the window background must be translucent -- see the FacetUIIME overlay,
++ *      which is what supplies that half;
++ *   2. cross-window blur must be enabled, which depends on
++ *      {@code ro.surface_flinger.supports_background_blur} and on the user not
++ *      having turned blurs off.
++ *
++ * The second can change at runtime -- battery saver and the developer option
++ * "disable blurs" both switch it off -- so this listens rather than reading it
++ * once. Without the listener the keyboard keeps a stale translucent background
++ * with nothing blurred behind it, which looks worse than no glass at all.
++ */
++public final class FacetUiWindowGlass {
++
++    private final Context mContext;
++    private Window mWindow;
++    private boolean mListenerAttached;
++
++    private final java.util.function.Consumer<Boolean> mBlurEnabledListener =
++            this::onBlurEnabledChanged;
++
++    public FacetUiWindowGlass(final Context context) {
++        mContext = context;
++    }
++
++    /**
++     * Attaches to the keyboard window and applies the blur. Safe to call every
++     * time the window is shown; attaching is idempotent.
++     */
++    public void attach(final Window window) {
++        if (window == null) {
++            return;
++        }
++        mWindow = window;
++        final WindowManager wm = mContext.getSystemService(WindowManager.class);
++        if (wm != null && !mListenerAttached) {
++            wm.addCrossWindowBlurEnabledListener(mContext.getMainExecutor(),
++                    mBlurEnabledListener);
++            mListenerAttached = true;
++        }
++        apply(wm == null || wm.isCrossWindowBlurEnabled());
++    }
++
++    /** Detaches the listener. Call from the service's onDestroy. */
++    public void detach() {
++        final WindowManager wm = mContext.getSystemService(WindowManager.class);
++        if (wm != null && mListenerAttached) {
++            wm.removeCrossWindowBlurEnabledListener(mBlurEnabledListener);
++            mListenerAttached = false;
++        }
++        mWindow = null;
++    }
++
++    private void onBlurEnabledChanged(final boolean enabled) {
++        apply(enabled);
++    }
++
++    private void apply(final boolean blurEnabled) {
++        if (mWindow == null) {
++            return;
++        }
++        final int radius = blurEnabled
++                ? mContext.getResources().getDimensionPixelSize(
++                        R.dimen.facetui_keyboard_blur_radius)
++                : 0;
++        mWindow.setBackgroundBlurRadius(radius);
++    }
++}
