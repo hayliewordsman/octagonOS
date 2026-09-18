@@ -47,6 +47,7 @@ import xml.etree.ElementTree as ET
 PATCH_PROVIDED = {
     "facetui_status_bar_notification_icon_mode": "patches/systemui/0003",
     "facetui_keyboard_blur_radius": "patches/ime/0001",
+    "facetui_popup_blur_radius": "patches/framework/0001",
 }
 
 #: overlay directory -> (target tree argument, list of res dirs to scan)

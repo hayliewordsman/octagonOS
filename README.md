@@ -25,6 +25,7 @@ including everything that has not, is in **[docs/status.md](docs/status.md)**.
 | Keyboard glass patch | **Applies cleanly** to a pristine LatinIME tree. Never compiled |
 | RRO overlays (4) | Sources **validate** against their target trees. Never built — no SDK here |
 | Icon engine patch | **Applies cleanly** to a pristine icon-loader tree. Never compiled |
+| Popup glass patch | **Applies cleanly**, alone and alongside the SystemUI three. Never compiled |
 | Icon pack | **Generated and verified.** 22 icons, 40 components, all checks pass. Never packaged — no SDK here |
 | Form-factor detection | **7/7 tests pass**, against synthetic bitmasks |
 | The AGSL shaders | **Never handed to a shader compiler.** Most likely thing to fail first |
@@ -48,7 +49,7 @@ unrelated resource names.
 | **Virtual keyboard** | Translucent background **and** a blurred window | overlay **+** patch |
 | Volume, power menu, bottom sheets | Pulled onto one depth tier | overlay |
 | **Dialogs, system-wide** | Real blur, translucency and reduced dim, from two empty styles | overlay |
-| **Popup and overflow menus** | Tint and hairline — blur needs a patch, see below | overlay |
+| **Popup and overflow menus** | Tint and hairline, plus real blur | overlay **+** patch |
 | Shade edge and rim | Two AGSL shaders | patch |
 | Status bar icons | Four modes, incl. a neutral privacy dot | patch |
 | **App icons — all of them** | Octagonal mask, a curated pack, and a procedural wrap for everything else | overlay **+** pack **+** patch |
@@ -158,8 +159,9 @@ Android 12, are read straight off a window's theme by
 *empty* platform styles — `Theme.Material.Dialog` and its Light twin — carry
 them down to every dialog variant in the system, so every dialog becomes real
 glass with no code. A `PopupWindow` is not a `PhoneWindow` and has no blur API
-at all, so menus get tint and a hairline and no more; that limit is named in
-[docs/facetui.md](docs/facetui.md) rather than glossed.
+at all, so no overlay can reach a menu — that needed a patch of its own, which
+borrows `BackgroundBlurDrawable` from `DecorView` and sits it underneath the
+popup's existing background.
 
 **One glass, never two.** The icon engine loads its tile *out of the pack*
 rather than generating its own, so a curated icon and a procedurally themed one

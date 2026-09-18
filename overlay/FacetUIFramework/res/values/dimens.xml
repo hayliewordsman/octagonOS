@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- FacetUI: blur behind popup menus, spinner dropdowns and autocomplete
+         lists. L2 in the depth model, the same tier as the volume dialog and
+         the power menu, because a menu is the same kind of small floating
+         panel and should be the same material.
+
+         This resource only exists on a build carrying
+         patches/framework/0001. The platform ships no such resource at all, so
+         on a Tier 2 image the entry is unused and menus are tinted but not
+         blurred. That is a real difference in how they look, and the reason
+         the fill alpha in the popup drawables is a compromise between the two
+         cases rather than tuned for either. -->
+    <dimen name="facetui_popup_blur_radius">24dp</dimen>
+</resources>

@@ -10,6 +10,7 @@ is one; see [`overlay/`](../overlay/).
 | [`systemui/0003`](systemui/0003-facetui-status-bar-icon-modes.patch) | Four status bar notification icon modes, including a neutral dot |
 | [`ime/0001`](ime/0001-facetui-glass-keyboard-window.patch) | Blurs behind the virtual keyboard window |
 | [`iconloader/0001`](iconloader/0001-facetui-icon-glass.patch) | Recomposes **every** app icon onto the FacetUI glass |
+| [`framework/0001`](framework/0001-facetui-popup-glass.patch) | Blurs behind popup menus, dropdowns and autocomplete lists |
 
 Apply the SystemUI patches in order; `0002` builds on `0001`.
 
@@ -35,8 +36,10 @@ to drift.
 
 ## Verification status
 
-- all five patches pass `git apply --check` against pristine trees, the three
-  SystemUI ones in sequence, and then apply
+- all six patches pass `git apply --check` against pristine trees. The three
+  SystemUI ones and `framework/0001` all target `frameworks/base` and were
+  verified to apply in sequence against one checkout, and `framework/0001`
+  again on its own
 - every symbol introduced is declared or imported, checked explicitly. This is
   worth doing rather than assuming: in the Android 16 original, `0001`'s import
   was missing on the first attempt and would not have compiled, despite the

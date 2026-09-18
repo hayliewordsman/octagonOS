@@ -24,7 +24,8 @@ written in.
 | The glyph bounds check itself | Verified to fail on purpose: regenerating the pack with the pre-fix constants makes it name all fifteen offending glyphs and exit non-zero, while the mask-only check it replaced still passes at 32.4 of 33 |
 | Octagon icon mask | The path is a true regular octagon, checked numerically: all eight sides 41.4214 |
 | Dialog glass | The theme path was read out of `PhoneWindow.generateLayout()` rather than assumed: all three blur attributes are consumed there unconditionally, and no platform theme sets any of them. `Theme.Material.Dialog` and its Light twin were confirmed empty in the platform, so overriding them risks losing nothing |
-| The popup limitation | Also checked rather than assumed: `Dialog` builds a `PhoneWindow`, and `PopupWindow` contains no blur API at all. Menus get tint and a hairline, and the overlay says so |
+| Popup glass patch | `git apply --check` passes on a pristine `frameworks/base`, both alone and after the three SystemUI patches. Every API it calls verified present with the signature used, including both `addCrossWindowBlurEnabledListener` overloads |
+| The popup limitation | Checked rather than assumed: `Dialog` builds a `PhoneWindow`, and `PopupWindow` contains no blur API at all. That is why menus needed `patches/framework/0001` rather than an overlay entry |
 | Style and drawable overrides | `validate-overlays.py` now covers both. All three new failure modes verified to fail on purpose: a dropped style item (named all 20), a changed parent, and a drawable absent from the target |
 | Every symbol the patches introduce | Checked to be imported or declared, including `Icon.createWithResource(String, int)` being the public overload and not the one marked "Do not use", and `isAmbient`/`notifKey` existing on `ActiveNotificationIconModel` |
 | Overlay resources | `tools/validate-overlays.py` passes: every overridden resource exists in its target tree, with the patch-provided ones exempted by name |
@@ -92,8 +93,8 @@ re-check:
       profile covers by default
 - [ ] Measure a dialog open with blur-behind on. If it drops frames, drop
       `windowBlurBehindEnabled` first and keep `windowBackgroundBlurRadius`
-- [ ] Decide whether menus are worth a `PopupWindow` patch, or whether tint and
-      a hairline is enough for them
+- [ ] Retune the popup fill alpha once the patch is running: it is currently a
+      compromise between the blurred and unblurred cases
 - [ ] Look at the icons on a real launcher at real density. 48dp is much smaller
       than any preview here, and legibility at that size is the whole question
 - [ ] Check the icon engine's cost on a cold app-drawer open. It composes an

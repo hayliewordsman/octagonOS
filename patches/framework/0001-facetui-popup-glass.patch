@@ -1,0 +1,203 @@
+diff --git a/core/java/android/widget/FacetUiPopupGlass.java b/core/java/android/widget/FacetUiPopupGlass.java
+new file mode 100644
+index 000000000..200e4c4b7
+--- /dev/null
++++ b/core/java/android/widget/FacetUiPopupGlass.java
+@@ -0,0 +1,160 @@
++/*
++ * Copyright (C) 2026 The octagonOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package android.widget;
++
++import android.content.Context;
++import android.graphics.PixelFormat;
++import android.graphics.drawable.Drawable;
++import android.graphics.drawable.GradientDrawable;
++import android.graphics.drawable.LayerDrawable;
++import android.view.View;
++import android.view.ViewRootImpl;
++import android.view.WindowManager;
++
++import com.android.internal.R;
++import com.android.internal.graphics.drawable.BackgroundBlurDrawable;
++
++import java.util.function.Consumer;
++
++/**
++ * Makes a {@link PopupWindow} a FacetUI glass surface.
++ *
++ * Overflow menus, spinner dropdowns and autocomplete lists are the one family
++ * of surfaces a resource overlay cannot reach. A PopupWindow is not a
++ * PhoneWindow: it attaches a view straight to the WindowManager, so it never
++ * runs PhoneWindow.generateLayout() and the windowBackgroundBlurRadius theme
++ * attribute that makes every dialog glass does nothing here. Without this, a
++ * menu can be tinted but not blurred, which by FacetUI's own rule is a tinted
++ * window rather than glass.
++ *
++ * The blur comes from {@link BackgroundBlurDrawable}, the same mechanism
++ * DecorView uses for window background blur. It blurs what is behind it,
++ * clipped to its own rounded bounds, so it can simply sit underneath the
++ * popup's existing background: the blur reads through the translucent fill,
++ * and the hairline stroke on top is untouched.
++ *
++ * Off by default. {@code R.dimen.facetui_popup_blur_radius} is 0 in the
++ * platform, so a build that does not override it behaves exactly as stock.
++ */
++final class FacetUiPopupGlass implements View.OnAttachStateChangeListener {
++
++    private final View mHost;
++    private final Drawable mOriginal;
++    private final int mBlurRadius;
++    private final float mCornerRadius;
++
++    private BackgroundBlurDrawable mBlur;
++    private boolean mListenerAttached;
++
++    private final Consumer<Boolean> mBlurEnabledListener = this::onBlurEnabledChanged;
++
++    /**
++     * Attaches glass to a popup's background view, if this build asks for it.
++     *
++     * @param host the view owning the popup background, which is the one whose
++     *             bounds match the visible panel. Not the decor view, whose
++     *             bounds include room for the drop shadow and would put a
++     *             blurred rectangle larger than the menu behind it.
++     * @param background the popup's existing background drawable.
++     */
++    static void attach(View host, Drawable background) {
++        if (host == null || background == null) {
++            return;
++        }
++        final Context context = host.getContext();
++        final int radius = context.getResources()
++                .getDimensionPixelSize(R.dimen.facetui_popup_blur_radius);
++        if (radius <= 0) {
++            return;
++        }
++        // An opaque background hides the blur completely, so producing one
++        // would cost a blur region for nothing. This is also what decides the
++        // popup window's pixel format, so an opaque drawable means the window
++        // is not translucent either and the blur could not composite anyway.
++        if (background.getOpacity() == PixelFormat.OPAQUE) {
++            return;
++        }
++        host.addOnAttachStateChangeListener(
++                new FacetUiPopupGlass(host, background, radius));
++    }
++
++    private FacetUiPopupGlass(View host, Drawable background, int blurRadius) {
++        mHost = host;
++        mOriginal = background;
++        mBlurRadius = blurRadius;
++        // Match the panel's own corners so the blur does not square off inside
++        // a rounded menu. Only a shape drawable can be asked; anything else
++        // gets square corners, which is correct for a square panel and the
++        // safe answer for one this cannot measure.
++        mCornerRadius = background instanceof GradientDrawable
++                ? ((GradientDrawable) background).getCornerRadius()
++                : 0f;
++    }
++
++    @Override
++    public void onViewAttachedToWindow(View v) {
++        final ViewRootImpl viewRoot = mHost.getViewRootImpl();
++        if (viewRoot == null) {
++            return;
++        }
++
++        final WindowManager wm = mHost.getContext().getSystemService(WindowManager.class);
++        if (wm != null && !mListenerAttached) {
++            // Cross-window blur can be switched off at runtime -- battery saver
++            // and the developer "disable blurs" option both do it. Reading it
++            // once would leave the menu translucent with nothing blurred behind
++            // it, which looks worse than no glass at all.
++            wm.addCrossWindowBlurEnabledListener(
++                    mHost.getContext().getMainExecutor(), mBlurEnabledListener);
++            mListenerAttached = true;
++        }
++
++        if (mBlur == null) {
++            mBlur = viewRoot.createBackgroundBlurDrawable();
++            mBlur.setCornerRadius(mCornerRadius);
++            // Underneath, so the existing fill and its hairline draw on top.
++            mHost.setBackground(new LayerDrawable(new Drawable[] { mBlur, mOriginal }));
++        }
++        apply(wm == null || wm.isCrossWindowBlurEnabled());
++    }
++
++    @Override
++    public void onViewDetachedFromWindow(View v) {
++        final WindowManager wm = mHost.getContext().getSystemService(WindowManager.class);
++        if (wm != null && mListenerAttached) {
++            wm.removeCrossWindowBlurEnabledListener(mBlurEnabledListener);
++            mListenerAttached = false;
++        }
++        // The drawable belongs to the ViewRootImpl this popup is leaving, so it
++        // cannot be carried over to the next attach. Dropping it here means the
++        // next one asks its own view root for a fresh one.
++        if (mBlur != null) {
++            mBlur = null;
++            mHost.setBackground(mOriginal);
++        }
++    }
++
++    private void onBlurEnabledChanged(boolean enabled) {
++        apply(enabled);
++    }
++
++    private void apply(boolean blurEnabled) {
++        if (mBlur != null) {
++            mBlur.setBlurRadius(blurEnabled ? mBlurRadius : 0);
++        }
++    }
++}
+diff --git a/core/java/android/widget/PopupWindow.java b/core/java/android/widget/PopupWindow.java
+index 11d2a47f9..e80e6cfc9 100644
+--- a/core/java/android/widget/PopupWindow.java
++++ b/core/java/android/widget/PopupWindow.java
+@@ -1495,6 +1495,10 @@ public class PopupWindow {
+         if (mBackground != null) {
+             mBackgroundView = createBackgroundView(mContentView);
+             mBackgroundView.setBackground(mBackground);
++            // FacetUI: blur what is behind the popup. A no-op unless this build
++            // sets R.dimen.facetui_popup_blur_radius, which the platform ships
++            // as 0.
++            FacetUiPopupGlass.attach(mBackgroundView, mBackground);
+         } else {
+             mBackgroundView = mContentView;
+         }
+diff --git a/core/res/res/values/dimens.xml b/core/res/res/values/dimens.xml
+index 729e6d59e..0670c5aea 100644
+--- a/core/res/res/values/dimens.xml
++++ b/core/res/res/values/dimens.xml
+@@ -1210,4 +1210,17 @@
+     <dimen name="app_lock_permission_review_app_list_expanded_height">320dp</dimen>
+     <dimen name="app_lock_pill_radius">100dp</dimen>
+     <dimen name="app_lock_top_margin">24sp</dimen>
++
++    <!-- FacetUI: how much to blur behind a PopupWindow - overflow menus,
++         spinner dropdowns, autocomplete lists.
++
++         0 is stock behaviour: no blur, nothing allocated, PopupWindow
++         unchanged. A build wanting glass menus overrides this, and the popup
++         background must also be translucent or there is nothing for the blur
++         to show through.
++
++         This exists as a resource rather than a constant so it can be retuned
++         per device by an overlay without another build, which is how the rest
++         of the FacetUI depth model is configured. -->
++    <dimen name="facetui_popup_blur_radius">0dp</dimen>
+ </resources>

@@ -137,17 +137,43 @@ possible risk.
 
 Miss any one and the other two are wasted — the same shape as the keyboard.
 
-### Menus are the honest limit
+### Menus needed a patch, and got one
 
 A `PopupWindow` is **not** a `PhoneWindow`. It attaches a view straight to the
 `WindowManager`, never runs `generateLayout()`, and exposes no blur API of its
-own — checked, there is none in the class. So overflow menus, spinner dropdowns
-and autocomplete lists get **tint and a hairline only**, which by the rule at
-the top of this page is a tinted window, not glass.
+own. So no resource overlay can make a menu glass — that is the ceiling for
+Tier 2, and overflow menus, spinner dropdowns and autocomplete lists get tint
+and a hairline only, which by the rule at the top of this page is a tinted
+window rather than glass.
 
-That is the ceiling for a resource-only change. Making menus genuinely glass
-needs a small framework patch setting a blur radius on the popup's own window.
-Not done here, and named rather than glossed.
+`patches/framework/0001` lifts that ceiling. The blur comes from
+`BackgroundBlurDrawable`, the same mechanism `DecorView` already uses for window
+background blur: it blurs what is behind it, clipped to its own rounded bounds,
+so it can simply sit **underneath** the popup's existing background. The
+translucent fill reads through it and the hairline draws on top, untouched.
+
+Three details decide whether it works:
+
+- **It attaches to the background view, not the decor view.** The decor's
+  bounds include room for the drop shadow, so blurring there would put a
+  blurred rectangle visibly larger than the menu behind it.
+- **It takes the corner radius from the popup's own background** when that is a
+  shape drawable, so the blur does not square off inside a rounded menu.
+- **It listens for cross-window blur being switched off**, which battery saver
+  and the developer "disable blurs" option both do. Reading the flag once would
+  leave a translucent menu with nothing blurred behind it.
+
+It is off unless asked for: `R.dimen.facetui_popup_blur_radius` is `0dp` in the
+platform, and a build that does not override it gets stock `PopupWindow`
+behaviour with nothing allocated. The patch also declines to do anything when
+the popup background is opaque — there would be nothing to see through, and
+that same opacity is what sets the popup window's pixel format, so the blur
+could not composite anyway.
+
+One consequence worth stating: the popup fill alpha is now a **compromise**.
+With the patch there is a blur behind it and it could open further; the same
+overlay ships on a Tier 2 image where there is not, and at much lower alpha an
+unblurred menu is hard to read over busy content.
 
 ## The three layers
 
@@ -170,6 +196,7 @@ express:
 | `systemui/0002` | `FacetRimShader`, **chained** onto the scrim's existing blur |
 | `systemui/0003` | Four status bar notification icon modes, including a neutral dot |
 | `ime/0001` | Blurs behind the keyboard window |
+| `framework/0001` | Blurs behind popup menus and dropdowns |
 
 ## The trap `0002` avoids
 
