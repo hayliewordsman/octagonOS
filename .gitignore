@@ -22,3 +22,8 @@ desktop/tools/*.xwd
 # are the deliverable; the .so must be built against the KWin it will run on,
 # so a committed binary would be wrong by the next KWin release.
 desktop/kwin/*/build/
+
+# The KSvg probe's build tree and the sheet it writes while checking. The
+# theme itself is committed; these are evidence for one run.
+desktop/tools/plasma-probe/build/
+desktop/tools/plasma-surfaces.png

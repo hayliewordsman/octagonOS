@@ -1,0 +1,11 @@
+{
+    "KPlugin": {
+        "Category": "",
+        "Description": "Glass: translucent surfaces with a hairline, for FacetUI",
+        "EnabledByDefault": true,
+        "License": "Apache-2.0",
+        "Name": "FacetUI",
+        "Version": "0.1"
+    },
+    "X-Plasma-API": "5.0"
+}

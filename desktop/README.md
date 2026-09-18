@@ -4,13 +4,15 @@ An Ubuntu-based Linux distribution carrying FacetUI — the same glass design
 language as the mobile edition, from the same maths in
 [`shared/facetui`](../shared/facetui).
 
-**Started.** The boot splash and the compositor effect are built, and they are
-the first pieces of octagonOS that have actually been *run* rather than
-verified.
+**Started.** The boot splash, the compositor effect and the Plasma style are
+built, and they are the first pieces of octagonOS that have actually been *run*
+rather than verified.
 
 ![The Plymouth theme](docs/preview/plymouth.png)
 
 ![Blur and tint alone, and the same surfaces with facetui-glass](docs/preview/kwin-glass.png)
+
+![The FacetUI Plasma surfaces](docs/preview/plasma.png)
 
 ## Status
 
@@ -18,8 +20,8 @@ verified.
 |---|---|
 | [Plymouth theme](plymouth/) | **Built and run.** The mark, the passphrase prompt, messages, teardown |
 | [KWin glass effect](kwin/) | **Built and loaded.** Compiles against KWin 6.7.5; KWin accepts the plugin. Drawing needs a GPU |
+| [Plasma style](plasma/) | **Built and rendered.** Every surface composited by KSvg and measured: alpha, hairline, corners |
 | Icon theme | Not started |
-| Plasma look-and-feel | Not started |
 | ISO | Not started |
 
 ## The compositor: KWin/Plasma on Wayland
@@ -79,5 +81,6 @@ form-factor detection — everything shaped by Android rather than by FacetUI.
 |---|---|
 | [`plymouth/`](plymouth/) | The boot splash |
 | [`kwin/`](kwin/) | The compositor effect: FacetUI's two shaders |
+| [`plasma/`](plasma/) | The Plasma style: translucency, the hairline, the colour scheme |
 | [`tools/`](tools/) | Verifiers, and the harness that runs a theme for real |
 | `docs/preview/` | Screenshots, taken by those tools |

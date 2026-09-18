@@ -39,7 +39,9 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "..", "shared"))
 from facetui.facet_math import edge_highlight, rim_darkening  # noqa: E402
-from facetui.palette import ACCENT_A, ACCENT_B  # noqa: E402
+from facetui.palette import (  # noqa: E402
+    ACCENT_A, ACCENT_B, HAIRLINE_ALPHA, SURFACE_ALPHA,
+)
 
 #: A phone, at a size that fits three of them side by side.
 W, H = 420, 900
@@ -51,13 +53,16 @@ L2 = 24 * PX_PER_DP
 L3 = 48 * PX_PER_DP
 L4 = 64 * PX_PER_DP
 
-#: Alphas, as the overlays ship them.
-DIALOG_ALPHA = 0xC4 / 255.0        # background_floating_device_default_dark
-POPUP_ALPHA = 0xC2 / 255.0         # popup_background_material, night
-SHADE_ALPHA = 0.78                 # the scrim, once notification_scrim_transparent is on
-DIALOG_DIM = 0.32                  # backgroundDimAmount, from the overlay
+#: Alphas, from shared/facetui/palette.py. They were duplicated here before the
+#: desktop edition needed the same numbers; a surface that reads as the same
+#: material on both platforms has to be described in one place, or it is a
+#: coincidence rather than a design.
+DIALOG_ALPHA = SURFACE_ALPHA["dialog"]
+POPUP_ALPHA = SURFACE_ALPHA["popup"]
+SHADE_ALPHA = SURFACE_ALPHA["shade"]
+DIALOG_DIM = 0.32                  # backgroundDimAmount, from the overlay; Android-only
 
-HAIRLINE = 0.18                    # #2EFFFFFF, near enough
+HAIRLINE = HAIRLINE_ALPHA
 FONTS = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",

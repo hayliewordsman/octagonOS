@@ -57,3 +57,33 @@ RIM_AMOUNT = 0.35
 
 #: Peak alpha of the specular edge. `FACETUI_EDGE_MAX_INTENSITY` in ScrimView.
 EDGE_INTENSITY = 0.50
+
+
+# --- surface alphas ---------------------------------------------------------
+#
+# How translucent each tier of glass is. These started as Android resource
+# values -- `background_floating_device_default_dark` is 0xC4, the night
+# `popup_background_material` is 0xC2, and the notification scrim lands at 0.78
+# once `notification_scrim_transparent` is on -- and they are here because the
+# desktop edition needs the same numbers to look like the same design.
+#
+# Three surfaces a user reads as "the same kind of floating panel" must be the
+# same material, even where the two platforms name them differently. That is
+# the depth model's whole argument, and it only holds if one file says what
+# translucent means.
+#
+# The second half of the rule: BLUR MUST BE BEHIND THEM. An alpha this high
+# over an unblurred backdrop is not glass, it is a dirty window. Where a
+# platform cannot blur -- Plasma with compositing off, Android on a device
+# without it -- the honest answer is an opaque surface, not this.
+SURFACE_ALPHA = {
+    "shade": 0.78,      # L4: the notification shade; the desktop panel
+    "dialog": 0xC4 / 255.0,
+    "popup": 0xC2 / 255.0,
+    "tooltip": 0xC2 / 255.0,
+}
+
+#: The hairline. A 1px stroke at the edge of a surface, and the third thing
+#: that must be true for glass -- without a boundary the surface dissolves into
+#: whatever is behind it. `#2EFFFFFF` on Android, which is this.
+HAIRLINE_ALPHA = 0x2E / 255.0

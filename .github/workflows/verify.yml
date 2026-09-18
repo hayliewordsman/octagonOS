@@ -220,3 +220,46 @@ jobs:
       # the plugin. It reports honestly that it cannot prove the effect DRAWS
       # correctly without a GPU -- that part is settled by kwin-shader above.
       - run: desktop/tools/run-kwin-effect.sh
+
+  plasma-style:
+    name: The Plasma style, rendered by Plasma's own engine
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install numpy pillow
+
+      # KSvg is Plasma's SVG engine, and it is what renders a desktop theme.
+      # Plasma::Svg moved into it for Plasma 6, so this is the library to
+      # check against, not libplasma. Ubuntu 24.04 has no Plasma 6; KDE neon
+      # is that same Ubuntu with Plasma 6 on top.
+      - name: KSvg, from KDE neon
+        run: |
+          set -eux
+          curl -fsSL https://archive.neon.kde.org/public.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/neon.gpg
+          echo "deb [signed-by=/usr/share/keyrings/neon.gpg] \
+                http://archive.neon.kde.org/user noble main" \
+            | sudo tee /etc/apt/sources.list.d/neon.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            kf6-ksvg-dev extra-cmake-modules qt6-base-dev \
+            libkf6coreaddons-dev libkf6config-dev
+
+      # Rebuild rather than trusting what is committed: a generator change
+      # nobody re-ran is the drift this is for.
+      - run: desktop/plasma/make-plasma-theme.py
+      - name: the committed theme is what the generator produces
+        run: git diff --exit-code --stat desktop/plasma/FacetUI
+
+      - run: desktop/tools/verify-plasma-theme.py
+
+      # The real thing: every surface painted by KSvg over black and over
+      # white, and the difference measured. An opaque dark surface looks
+      # exactly like a translucent one until something subtracts the two.
+      - run: desktop/tools/run-plasma-theme.sh
+
+      # Rendered but not diffed, for the reason given in the kwin-shader job:
+      # the preview draws text, so its pixels depend on the fonts installed.
+      - run: desktop/tools/render-plasma-surfaces.py --out /tmp/plasma.png
