@@ -1,0 +1,80 @@
+Source: octagonos-facetui
+Section: kde
+Priority: optional
+Maintainer: The octagonOS Project <noreply@octagonos.dev>
+Build-Depends: debhelper-compat (= 13),
+               cmake,
+               extra-cmake-modules,
+               kwin-dev,
+               qt6-base-dev,
+               libkf6coreaddons-dev,
+               libkf6config-dev,
+               libkf6svg-dev | kf6-ksvg-dev,
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+
+Package: facetui-kwin-effect
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: FacetUI glass effect for KWin
+ The specular edge and the rim darkening that turn a blurred, translucent
+ surface into glass, as a KWin effect. Transcribed from the AGSL that ships on
+ the Android edition of octagonOS, and checked against the same NumPy both are
+ lit by.
+ .
+ KWin's effect API is not binary compatible across versions, so this must be
+ built against the KWin it runs on. The dependency below is generated from the
+ library it linked against, which enforces that.
+
+Package: facetui-plasma-style
+Architecture: all
+Depends: ${misc:Depends}
+Description: FacetUI Plasma style and colour scheme
+ Translucent surfaces with a one-pixel hairline, and the colour scheme the rest
+ of the desktop is drawn in. Two of the three things a surface needs to be
+ glass; KWin's blur effect is the third, and facetui-kwin-effect lights it.
+ .
+ The tint is not in these files: Plasma replaces the theme's stylesheet with
+ the live colour scheme, so the surfaces take the system's colour rather than
+ one baked in.
+
+Package: facetui-icon-theme
+Architecture: all
+Depends: ${misc:Depends}
+Recommends: breeze-icon-theme, hicolor-icon-theme
+Description: glass octagons for application and freedesktop icons
+ A glass octagon with a glyph on it, at eight sizes, for the standard
+ freedesktop icon names and for the application ids of programs a desktop tends
+ to have. Everything else inherits from Breeze.
+ .
+ The glass is rendered from the same code the Android icon pack draws its
+ adaptive-icon backgrounds with.
+
+Package: facetui-plymouth-theme
+Architecture: all
+Depends: ${misc:Depends}, plymouth, initramfs-tools | dracut
+Description: FacetUI boot splash for Plymouth
+ The octagonOS mark, rendered from FacetUI's own shader maths, with a
+ passphrase prompt for encrypted disks that does not depend on a font being
+ present in the initramfs.
+ .
+ Installing this makes it the default boot theme and rebuilds the initramfs,
+ because Plymouth runs from the initramfs and a theme that is only in
+ /usr/share changes nothing about the next boot.
+
+Package: octagonos-facetui
+Architecture: all
+Depends: ${misc:Depends},
+         facetui-kwin-effect,
+         facetui-plasma-style,
+         facetui-icon-theme,
+         facetui-plymouth-theme,
+Description: FacetUI, selected by default
+ Ships the system defaults that make FacetUI the desktop's theme rather than
+ one of its options, and a Global Theme entry so it can be re-selected after a
+ user changes something.
+ .
+ Naming a look-and-feel package is not enough on its own: its defaults are only
+ applied when someone selects it, and every component reads kdeglobals and
+ plasmarc directly. So those are shipped as system configuration, which a
+ user's own choices still override.

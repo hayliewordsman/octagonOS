@@ -1,0 +1,4 @@
+defaults/kdeglobals         etc/xdg/
+defaults/plasmarc           etc/xdg/
+defaults/kwinrc             etc/xdg/
+lookandfeel/dev.octagonos.facetui  usr/share/plasma/look-and-feel/

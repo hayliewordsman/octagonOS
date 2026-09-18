@@ -304,3 +304,43 @@ jobs:
       - run: SKIP_APK=1 mobile/iconpack/build.sh
       - name: the Android icon pack still renders identically
         run: git diff --exit-code --stat mobile/iconpack/FacetUIIcons
+
+  packaging:
+    name: The packages build, and FacetUI comes out as the default
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: KWin 6 and the packaging tools, from KDE neon
+        run: |
+          set -eux
+          curl -fsSL https://archive.neon.kde.org/public.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/neon.gpg
+          echo "deb [signed-by=/usr/share/keyrings/neon.gpg] \
+                http://archive.neon.kde.org/user noble main" \
+            | sudo tee /etc/apt/sources.list.d/neon.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            debhelper fakeroot lintian dpkg-dev cmake \
+            kwin-dev extra-cmake-modules qt6-base-dev \
+            libkf6coreaddons-dev libkf6config-dev kf6-ksvg-dev \
+            kf6-kconfig-bin plasma-workspace plymouth \
+            libegl1-mesa-dev libgles2-mesa-dev libgl1-mesa-dri \
+            gtk-update-icon-cache breeze-icon-theme hicolor-icon-theme
+          pip install numpy pillow cairosvg
+
+      - run: desktop/packaging/build-debs.sh
+
+      # Packaging mistakes that reach a machine are expensive; lintian is free.
+      - name: lintian
+        run: |
+          cd desktop/packaging/out
+          lintian --tag-display-limit 0 --fail-on error,warning \
+            --suppress-tags unstripped-binary-or-object,no-manual-page *.deb
+
+      - name: install them
+        run: sudo dpkg -i desktop/packaging/out/*.deb
+
+      # THE question: installed, or actually in use? Resolved the way a Plasma
+      # component resolves it, as a user with an empty home directory.
+      - run: desktop/tools/check-facetui-defaults.sh

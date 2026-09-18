@@ -1,0 +1,18 @@
+#!/bin/sh
+# Hand the default back before the files go, so the alternative never points at
+# a theme that is not there -- which would leave the machine with no boot
+# splash at all rather than the one it had before.
+set -e
+
+case "$1" in
+    remove|deconfigure)
+        update-alternatives --remove default.plymouth \
+            /usr/share/plymouth/themes/octagonos/octagonos.plymouth
+        if command -v update-initramfs >/dev/null 2>&1; then
+            update-initramfs -u
+        fi
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

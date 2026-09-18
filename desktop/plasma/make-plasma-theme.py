@@ -162,6 +162,19 @@ def colours():
 
 
 def write_colours(path):
+    """The colour scheme, in KColorScheme's ini format.
+
+    Written to TWO places, and they are not the same thing:
+
+      FacetUI/colors                       the Plasma style's own colours
+      /usr/share/color-schemes/FacetUI.colors  the system colour scheme
+
+    `kdeglobals [General] ColorScheme=FacetUI` resolves against the SECOND
+    one. Shipping only the first gives a Plasma style that looks right and a
+    desktop whose windows, menus and text still come from whatever scheme was
+    there before -- which reads as the theme half-applying rather than as a
+    missing file.
+    """
     with open(path, "w") as fh:
         for group, entries in colours().items():
             fh.write(f"[{group}]\n")
@@ -407,10 +420,14 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     (out / "metadata.json").write_text(json.dumps(METADATA, indent=4) + "\n")
     write_colours(out / "colors")
+    # The same content, at the path the system colour scheme is looked up by.
+    write_colours(out.parent / f"{THEME}.colors")
     (out / "plasmarc").write_text(PLASMARC)
 
     note(f"[*] {out}")
-    note(f"    {written} frame SVGs, a colour scheme, metadata and plasmarc")
+    note(f"    {written} frame SVGs, metadata and plasmarc")
+    note(f"    colour scheme written to FacetUI/colors and "
+         f"{THEME}.colors (the system scheme)")
     note(f"    surface alphas: " + ", ".join(
         f"{k} {v:.2f}" for k, v in sorted(SURFACE_ALPHA.items())))
 

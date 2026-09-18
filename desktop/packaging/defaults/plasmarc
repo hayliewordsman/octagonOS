@@ -1,0 +1,5 @@
+# octagonOS: the Plasma style. Resolved against
+# /usr/share/plasma/desktoptheme/FacetUI, which facetui-plasma-style ships.
+
+[Theme]
+name=FacetUI

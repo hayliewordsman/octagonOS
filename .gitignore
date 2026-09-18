@@ -30,3 +30,7 @@ desktop/tools/plasma-surfaces.png
 
 # The icon probe's build tree. The theme itself is committed.
 desktop/tools/icon-probe/build/
+
+# Built packages. The packaging is the deliverable; the .debs are built from it
+# and depend on the exact KWin they were compiled against.
+desktop/packaging/out/

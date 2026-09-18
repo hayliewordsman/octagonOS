@@ -1,0 +1,28 @@
+#!/usr/bin/make -f
+# SPDX-FileCopyrightText: 2026 The octagonOS Project
+# SPDX-License-Identifier: Apache-2.0
+#
+# The KWin effect is the only thing here that compiles. The rest is generated
+# artwork and configuration, staged by debian/*.install.
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@ --sourcedirectory=desktop/kwin/facetui-glass --builddirectory=obj-kwin
+
+# The generators are run at build time rather than the theme being shipped
+# pre-built into the package, so the .deb cannot disagree with the source it
+# was built from.
+override_dh_auto_configure:
+	python3 desktop/plasma/make-plasma-theme.py --quiet
+	python3 desktop/icons/make-icon-theme.py --quiet
+	python3 desktop/plymouth/make-plymouth-theme.py --quiet
+	dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release
+
+# The static checks run in the build. A package that installs a theme its own
+# verifier rejects is worse than a build failure, because it reaches a machine.
+override_dh_auto_test:
+	python3 desktop/tools/verify-plasma-theme.py
+	python3 desktop/tools/verify-icon-theme.py
+	python3 desktop/tools/verify-plymouth-theme.py
+	python3 desktop/tools/validate-kwin-shaders.py

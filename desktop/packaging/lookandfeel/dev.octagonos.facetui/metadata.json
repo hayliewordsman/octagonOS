@@ -1,0 +1,17 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "The octagonOS Project"
+            }
+        ],
+        "Category": "",
+        "Description": "Glass, from the boot splash to the panel",
+        "Id": "dev.octagonos.facetui",
+        "License": "Apache-2.0",
+        "Name": "FacetUI",
+        "Version": "0.1",
+        "Website": "https://github.com/hayliewordsman/octagonOS"
+    },
+    "KPackageStructure": "Plasma/LookAndFeel"
+}

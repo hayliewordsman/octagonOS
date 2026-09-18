@@ -1,0 +1,16 @@
+#!/bin/sh
+# GTK reads icon themes through a cache. Without it every lookup walks the
+# directory tree, which is slow rather than broken -- but the cache builder is
+# also GTK's validator, so running it here fails loudly on a malformed theme.
+set -e
+
+case "$1" in
+    configure)
+        if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+            gtk-update-icon-cache --quiet --force /usr/share/icons/FacetUI || true
+        fi
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

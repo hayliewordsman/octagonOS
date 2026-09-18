@@ -1,0 +1,17 @@
+# octagonOS: the compositor side of FacetUI.
+#
+# facetui-glass declares EnabledByDefault in its own metadata, so KWin loads it
+# without this file -- it is pinned here anyway, because a default that is only
+# implicit is one nobody can see when it stops happening.
+#
+# Blur matters as much as the effect. FacetUI's rule is that blur,
+# translucency and a boundary must all be true together; the effect supplies
+# the boundary's light, this supplies the blur, and the Plasma style supplies
+# the translucency. Any one missing wastes the other two.
+
+[Plugins]
+facetui-glassEnabled=true
+blurEnabled=true
+
+[Compositing]
+Enabled=true

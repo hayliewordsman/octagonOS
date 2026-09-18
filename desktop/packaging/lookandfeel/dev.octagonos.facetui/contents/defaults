@@ -1,0 +1,27 @@
+# What "FacetUI" means as a Global Theme.
+#
+# This file is applied when someone SELECTS FacetUI in System Settings, or runs
+# plasma-apply-lookandfeel. It is NOT applied merely by naming this package in
+# kdeglobals -- tested, and the icon theme stayed unset. That is why
+# /etc/xdg/kdeglobals and /etc/xdg/plasmarc carry the same values directly:
+# those are what every component actually reads.
+#
+# So the two are deliberately redundant. The system defaults make FacetUI the
+# desktop's theme on a fresh user; this file makes it something a user can come
+# back to after changing one of the pieces.
+
+[kdeglobals][KDE]
+widgetStyle=Breeze
+
+[kdeglobals][General]
+ColorScheme=FacetUI
+
+[kdeglobals][Icons]
+Theme=FacetUI
+
+[plasmarc][Theme]
+name=FacetUI
+
+[kwinrc][Plugins]
+facetui-glassEnabled=true
+blurEnabled=true

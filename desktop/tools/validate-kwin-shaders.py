@@ -244,6 +244,21 @@ def check_transcription(glsl):
                 out[key] = re.sub(r"\s+", "", m.group(1))
         return out
 
+    # The AGSL lives in the Android half of the repository. A source package
+    # of the DESKTOP edition does not carry it, and should not -- so this
+    # check announces that it is not running rather than crashing on a missing
+    # file or, worse, passing quietly with nothing to compare against.
+    missing = [p for p in AGSL_PATCHES.values() if not p.exists()]
+    if missing:
+        print("[skip] the AGSL patches are not in this tree, so the GLSL "
+              "cannot be compared")
+        print("       against them. This is expected in a source package of "
+              "the desktop")
+        print("       edition alone; it runs on the full repository, where "
+              "drift between")
+        print("       the two platforms is what it exists to catch.")
+        return
+
     agsl = {}
     for path in AGSL_PATCHES.values():
         body = "\n".join(l[1:] for l in path.read_text().splitlines()

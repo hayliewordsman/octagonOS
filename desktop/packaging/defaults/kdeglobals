@@ -1,0 +1,19 @@
+# octagonOS: FacetUI as the desktop's defaults.
+#
+# SYSTEM defaults, in the XDG config cascade. A user's own ~/.config/kdeglobals
+# still wins, which is what makes this a default rather than a lock. On a fresh
+# install or a live session every user is new, so every user gets these.
+#
+# Naming the look-and-feel package below does NOT apply its contents: those are
+# only written out when someone selects it in System Settings. Every component
+# reads the keys here directly, so the keys have to be here.
+
+[KDE]
+LookAndFeelPackage=dev.octagonos.facetui
+widgetStyle=Breeze
+
+[General]
+ColorScheme=FacetUI
+
+[Icons]
+Theme=FacetUI

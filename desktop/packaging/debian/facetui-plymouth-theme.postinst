@@ -1,0 +1,29 @@
+#!/bin/sh
+# Plymouth runs from the INITRAMFS, not from the root filesystem. Copying the
+# theme into /usr/share and setting it as the default changes nothing about the
+# next boot until the initramfs is rebuilt to carry it. That is the single most
+# common way a Plymouth theme appears not to work at all.
+set -e
+
+THEME=/usr/share/plymouth/themes/octagonos/octagonos.plymouth
+
+case "$1" in
+    configure)
+        update-alternatives --install \
+            /usr/share/plymouth/themes/default.plymouth default.plymouth \
+            "$THEME" 200
+        update-alternatives --set default.plymouth "$THEME"
+
+        if command -v update-initramfs >/dev/null 2>&1; then
+            update-initramfs -u
+        elif command -v dracut >/dev/null 2>&1; then
+            dracut -f
+        else
+            echo "facetui-plymouth-theme: no initramfs tool found; rebuild the" >&2
+            echo "  initramfs by hand or the theme will not appear at boot." >&2
+        fi
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

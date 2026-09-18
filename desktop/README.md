@@ -24,6 +24,7 @@ actually been *run* rather than verified.
 | [KWin glass effect](kwin/) | **Built and loaded.** Compiles against KWin 6.7.5; KWin accepts the plugin. Drawing needs a GPU |
 | [Plasma style](plasma/) | **Built and rendered.** Every surface composited by KSvg and measured: alpha, hairline, corners |
 | [Icon theme](icons/) | **Built and resolved.** 124 names over 8 sizes, each checked against the file it ships, by Qt and by GTK |
+| [Packaging](packaging/) | **Built and installed.** Five `.deb`s, lintian-clean; FacetUI verified to be the default, not an option |
 | ISO | Not started |
 
 ## The compositor: KWin/Plasma on Wayland
@@ -85,5 +86,6 @@ form-factor detection — everything shaped by Android rather than by FacetUI.
 | [`kwin/`](kwin/) | The compositor effect: FacetUI's two shaders |
 | [`plasma/`](plasma/) | The Plasma style: translucency, the hairline, the colour scheme |
 | [`icons/`](icons/) | The icon theme: the glass octagon, with the shared glyphs |
+| [`packaging/`](packaging/) | The `.deb`s, and the defaults that select FacetUI |
 | [`tools/`](tools/) | Verifiers, and the harness that runs a theme for real |
 | `docs/preview/` | Screenshots, taken by those tools |

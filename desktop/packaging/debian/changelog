@@ -1,0 +1,7 @@
+octagonos-facetui (0.1) unstable; urgency=medium
+
+  * Initial packaging: the KWin glass effect, the Plasma style and colour
+    scheme, the icon theme, the Plymouth theme, and the system defaults that
+    select them.
+
+ -- The octagonOS Project <noreply@octagonos.dev>  Fri, 18 Sep 2026 00:00:00 +0000
