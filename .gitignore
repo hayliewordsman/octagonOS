@@ -34,3 +34,7 @@ desktop/tools/icon-probe/build/
 # Built packages. The packaging is the deliverable; the .debs are built from it
 # and depend on the exact KWin they were compiled against.
 desktop/packaging/out/
+
+# Built images, and the evidence a boot check leaves beside them. The build
+# script is the deliverable; an ISO is ~1 GB and is rebuilt from it.
+desktop/iso/out/

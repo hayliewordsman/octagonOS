@@ -1,0 +1,15 @@
+[Unit]
+Description=octagonOS self-test (reports FacetUI's state over the serial console)
+# Inert unless asked for. The image carries this; it does not run it.
+ConditionKernelCommandLine=octagonos.selftest
+After=graphical.target
+Wants=graphical.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/octagonos/octagonos-selftest.sh
+RemainAfterExit=yes
+StandardOutput=null
+
+[Install]
+WantedBy=graphical.target
