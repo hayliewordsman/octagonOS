@@ -21,11 +21,11 @@ actually been *run* rather than verified.
 | | |
 |---|---|
 | [Plymouth theme](plymouth/) | **Built and run.** The mark, the passphrase prompt, messages, teardown |
-| [KWin glass effect](kwin/) | **Built and loaded.** Compiles against KWin 6.7.5; KWin accepts the plugin. Drawing needs a GPU |
+| [KWin glass effect](kwin/) | **Built, loaded and running.** Compiles against KWin 6.7.5, and [reported loaded and running](iso/evidence/) by KWin in a booted session on an OpenGL scene |
 | [Plasma style](plasma/) | **Built and rendered.** Every surface composited by KSvg and measured: alpha, hairline, corners |
 | [Icon theme](icons/) | **Built and resolved.** 124 names over 8 sizes, each checked against the file it ships, by Qt and by GTK |
 | [Packaging](packaging/) | **Built and installed.** Five `.deb`s, lintian-clean; FacetUI verified to be the default, not an option |
-| ISO | Not started |
+| [ISO](iso/) | **Built, verified and booted.** 1.7G live image; boots to a Plasma Wayland session that reports FacetUI running |
 
 ## The compositor: KWin/Plasma on Wayland
 
@@ -58,10 +58,19 @@ with real keystrokes and screenshotted, and four bugs came out of doing that
 which no amount of reading the script had found.
 
 That is the standard this edition is held to: seen working, not verified as far
-as possible. Where it cannot be met, it is named rather than blurred — the
-compositor effect builds, loads and is accepted by KWin, and whether it *draws*
-correctly needs a GPU this has not had. Its arithmetic is settled separately,
-against a real driver.
+as possible. The compositor effect now meets it — a booted live image reports
+`facetui-glass is loaded and running` on an OpenGL scene, with KWin's own blur
+loaded beside it as the control. See [`iso/evidence/`](iso/evidence/).
+
+Where the standard still cannot be met it is named rather than blurred, and
+here there are two such places. The test machine has no GPU, so OpenGL was
+**forced**: Mesa's software rasteriser tells KWin not to use OpenGL and KWin
+believes it, loading no OpenGL effect at all — not FacetUI's and not its own.
+Every frame in that run was drawn by the CPU, and none of it is a claim about
+performance on hardware. And the run proves the effect *runs*, not that the
+glass *looks right*: QEMU cannot photograph the guest's Wayland output, so
+there is no picture. Appearance is settled separately and offline — the shader
+against NumPy, the Plasma surfaces rendered by KSvg and measured.
 
 ## What ported, and what did not
 

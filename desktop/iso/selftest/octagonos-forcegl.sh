@@ -33,3 +33,21 @@ grep -qw octagonos.forcegl /proc/cmdline || exit 0
 if ! grep -q '^KWIN_COMPOSE=' /etc/environment 2>/dev/null; then
     echo 'KWIN_COMPOSE=O2ES' >> /etc/environment
 fi
+
+# NOT SET: KWIN_DRM_NO_AMS.
+#
+# QEMU's screendump of this guest returns "Display output is not active" as
+# soon as kwin_wayland takes the DRM device, so the run where everything
+# worked produced a black screenshot. Legacy modesetting was the obvious
+# suspect and was tried: it changed nothing, the screenshot was still black.
+# It is recorded here rather than left in the file, because shipping a
+# setting that alters KWin's modesetting path with a comment claiming it
+# enables screenshots would be a lie in the code.
+#
+# Capturing from inside the compositor is the approach that would work --
+# KWin's screenshot.so provides org.kde.KWin.ScreenShot2 -- but that API
+# takes a pipe file descriptor over D-Bus, which is a real client to write
+# and debug inside a guest reachable only through a one-way serial console.
+# The claim it would support (the glass LOOKS right) is covered offline
+# instead, by the shader checked against NumPy and the Plasma surfaces
+# rendered and measured.
