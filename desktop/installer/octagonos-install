@@ -4,6 +4,7 @@
 #
 #     octagonos-install [--disk /dev/sdX] [--hostname NAME] [--user NAME]
 #                       [--password PASS] [--unattended] [--keep-octagon]
+#                       [--force]
 #
 # WHY A SCRIPT AND NOT ONLY CALAMARES
 #
@@ -40,6 +41,7 @@ USER_NEW=""
 PASS_NEW=""
 UNATTENDED=0
 KEEP_OCTAGON=0
+FORCE=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -49,6 +51,7 @@ while [ $# -gt 0 ]; do
         --password)    PASS_NEW="$2"; shift 2 ;;
         --unattended)  UNATTENDED=1; shift ;;
         --keep-octagon) KEEP_OCTAGON=1; shift ;;
+        --force)       FORCE=1; shift ;;
         -h|--help)     sed -n '2,25p' "$0" | sed 's/^# \?//'; exit 0 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
@@ -58,6 +61,36 @@ say()  { echo "[*] $*"; }
 die()  { echo "[FAIL] $*" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || die "this needs root"
+
+# REFUSE TO RUN OUTSIDE A LIVE SESSION.
+#
+# The guard below stops you installing over the medium you booted from. It
+# cannot stop something worse: running this on an ordinary working machine,
+# where there is no live medium at all, so that check finds nothing, passes,
+# and the script cheerfully repartitions whatever --disk names. That is a
+# command someone copies out of documentation into the wrong terminal, and
+# the cost of being wrong is somebody's disk.
+#
+# So the default is to run only where installing makes sense. --force is for
+# people who mean it.
+is_live() {
+    [ -f /cdrom/casper/filesystem.squashfs ] && return 0
+    [ -d /run/live/medium ] && return 0
+    grep -qw boot=casper /proc/cmdline 2>/dev/null && return 0
+    [ "$(findmnt -n -o FSTYPE / 2>/dev/null)" = overlay ] && return 0
+    return 1
+}
+
+if [ "$FORCE" -eq 0 ] && ! is_live; then
+    echo "[FAIL] this does not look like an octagonOS live session." >&2
+    echo "       Nothing about this machine says it was booted from the" >&2
+    echo "       installation medium, and installing would repartition" >&2
+    echo "       ${DISK:-the disk you name} on the machine you are sitting at." >&2
+    echo >&2
+    echo "       Boot the ISO and run it there. If you really mean to do" >&2
+    echo "       this here, pass --force." >&2
+    exit 1
+fi
 
 TARGET=/target
 SQUASH=/cdrom/casper/filesystem.squashfs
