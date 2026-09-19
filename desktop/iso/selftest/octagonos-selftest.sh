@@ -28,12 +28,54 @@ exec 2>/dev/null
 # a failure that is really impatience.
 UID_N=1000
 BUS="/run/user/$UID_N/bus"
-for _ in $(seq 1 180); do
-    [ -S "$BUS" ] && break
-    sleep 1
+
+# How long to wait. 180s was the first guess and it was wrong: under QEMU's
+# software emulation, with no KVM, SDDM and Plasma take many minutes to reach
+# a session, and the self-test was reporting "the desktop did not start" about
+# a desktop that was still starting. Overridable from the kernel command line
+# so a slow machine can be given longer without rebuilding the image.
+WAIT=900
+for arg in $(cat /proc/cmdline 2>/dev/null); do
+    case "$arg" in
+        octagonos.selftest.wait=*) WAIT="${arg#*=}" ;;
+    esac
 done
+
+waited=0
+while [ "$waited" -lt "$WAIT" ]; do
+    [ -S "$BUS" ] && break
+    sleep 5
+    waited=$((waited + 5))
+done
+
 if [ ! -S "$BUS" ]; then
-    say "FAIL no session bus after 180s; the desktop did not start"
+    say "FAIL no session bus after ${WAIT}s; the desktop did not start"
+
+    # SAY WHY, not just that. The first time this fired it reported the
+    # symptom and nothing else, and finding the cause -- an autologin session
+    # name that matched no session file, so SDDM fell back to its greeter --
+    # took another full boot and a screenshot. Everything below was what had
+    # to be gathered by hand afterwards, so the next failure carries it.
+    say "---- why ----"
+    say "display-manager: $(systemctl is-active display-manager.service 2>/dev/null || echo unknown)"
+    say "sddm:            $(systemctl is-active sddm.service 2>/dev/null || echo unknown)"
+    say "graphical.target:$(systemctl is-active graphical.target 2>/dev/null || echo unknown)"
+
+    au="$(sed -n 's/^User=//p'    /etc/sddm.conf.d/*.conf 2>/dev/null | head -1)"
+    as="$(sed -n 's/^Session=//p' /etc/sddm.conf.d/*.conf 2>/dev/null | head -1)"
+    say "autologin:       user='${au:-unset}' session='${as:-unset}'"
+    if [ -n "$as" ] && [ ! -f "/usr/share/wayland-sessions/${as%.desktop}.desktop" ] \
+                    && [ ! -f "/usr/share/xsessions/${as%.desktop}.desktop" ]; then
+        say "                 ^ that session file DOES NOT EXIST. SDDM will"
+        say "                   show its greeter instead of logging anyone in."
+        say "                 available: $(ls /usr/share/wayland-sessions /usr/share/xsessions 2>/dev/null | tr '\n' ' ')"
+    fi
+    say "sessions:        $(loginctl list-sessions --no-legend 2>/dev/null | wc -l) open"
+    say "run/user:        $(ls /run/user 2>/dev/null | tr '\n' ' ')"
+
+    journalctl -u sddm.service -n 12 --no-pager 2>/dev/null \
+        | while IFS= read -r l; do say "sddm| $l"; done
+
     say "END"
     exit 1
 fi

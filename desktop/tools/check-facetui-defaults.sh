@@ -120,6 +120,56 @@ fi
 
 # Plymouth is not an XDG setting at all: the boot theme is an alternative, and
 # it is chosen before any user exists.
+# --- the session that is supposed to start ----------------------------------
+#
+# Added after a boot test found the image sitting on a wallpaper forever.
+# SDDM's autologin named Session=plasmawayland, which is the Plasma 5 name;
+# Plasma 6 ships plasma.desktop. A session name that does not resolve is not
+# an error anybody sees -- autologin silently does not happen and the greeter
+# comes up instead, so the image looks like it is still booting.
+#
+# Neither the packaging checks nor the ISO content checks could see this:
+# every file was present and correct, and the fault was a name in a config
+# referring to a file that was never looked for. So it is looked for here.
+echo "[*] the session autologin asks for"
+sddm_conf="$ROOT/etc/sddm.conf.d/octagonos.conf"
+if [ ! -f "$sddm_conf" ]; then
+    echo "  FAIL  no $sddm_conf; nothing would log in automatically"
+    fail=1
+else
+    au="$(sed -n 's/^User=//p'    "$sddm_conf" | head -1)"
+    as="$(sed -n 's/^Session=//p' "$sddm_conf" | head -1)"
+
+    if [ -z "$au" ]; then
+        echo "  FAIL  autologin names no user"; fail=1
+    elif [ -f "$ROOT/etc/passwd" ] && ! awk -F: -v u="$au" '$1==u{f=1} END{exit !f}' \
+            "$ROOT/etc/passwd"; then
+        echo "  FAIL  autologin user '$au' does not exist in the image"; fail=1
+    else
+        echo "  ok    autologin user $au exists"
+    fi
+
+    # SDDM accepts the name with or without .desktop, and looks in both the
+    # wayland and X11 session directories.
+    if [ -z "$as" ]; then
+        echo "  FAIL  autologin names no session"; fail=1
+    else
+        sf="${as%.desktop}.desktop"
+        if [ -f "$ROOT/usr/share/wayland-sessions/$sf" ]; then
+            echo "  ok    autologin session $as resolves to wayland-sessions/$sf"
+        elif [ -f "$ROOT/usr/share/xsessions/$sf" ]; then
+            echo "  ok    autologin session $as resolves to xsessions/$sf"
+        else
+            echo "  FAIL  autologin session '$as' matches no session file;"
+            echo "        available:" \
+                 "$(ls "$ROOT/usr/share/wayland-sessions" \
+                       "$ROOT/usr/share/xsessions" 2>/dev/null \
+                    | grep '\.desktop$' | tr '\n' ' ')"
+            fail=1
+        fi
+    fi
+fi
+
 echo "[*] the boot splash"
 # Resolved by following the symlink chain, NOT by asking update-alternatives.
 #

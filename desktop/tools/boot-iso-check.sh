@@ -108,28 +108,9 @@ cp "$SERIAL" "$OUTDIR/$(basename "${ISO%.iso}")-serial.log"
 [ -f "$SHOT" ] && echo && echo "[*] screenshot: $SHOT"
 
 echo
-if grep -q "OCTAGONOS-SELFTEST: FAIL" "$SERIAL"; then
-    # ATTRIBUTE THE FAILURE BEFORE REPORTING IT.
-    #
-    # KWin's own blur is the control. It is an OpenGL effect maintained by
-    # people who are not me, so if it is out too, the guest has no working
-    # OpenGL and the facetui-glass line says nothing about facetui-glass --
-    # reporting that as "FacetUI is broken" would be a false accusation
-    # against the code and would send me editing a shader that is fine.
-    #
-    # Only when blur loaded and ours did not is the effect itself implicated.
-    if grep -q "INFO kwin blur loaded: false" "$SERIAL" \
-       || grep -q "FAIL no /dev/dri render node" "$SERIAL" \
-       || grep -q "FAIL compositing is" "$SERIAL"; then
-        echo "INCONCLUSIVE: this guest has no working OpenGL compositing --"
-        echo "KWin's own blur did not load either. Nothing here is evidence"
-        echo "about facetui-glass; fix the guest's graphics, then re-run."
-        exit 2
-    fi
-    echo "FAILED: the image booted with OpenGL compositing working (KWin's"
-    echo "own blur loaded), and FacetUI is still not running on it. That is"
-    echo "a real failure in FacetUI, not in the test environment."
-    exit 1
-fi
-echo "FacetUI is running on a booted machine, with OpenGL compositing and the"
-echo "glass effect loaded. That is the one thing no offline check could settle."
+# The verdict lives in its own script so it can be tested against a log
+# without booting anything -- which is how the last version of it was caught
+# announcing that blur had loaded on a boot where no blur line existed.
+HERE="$(cd "$(dirname "$0")" && pwd)"
+"$HERE/judge-selftest.sh" "$SERIAL"
+exit $?

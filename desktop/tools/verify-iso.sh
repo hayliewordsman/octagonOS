@@ -94,13 +94,17 @@ if ! command -v unsquashfs >/dev/null; then
 else
     # Only what the defaults check needs, not the whole root: a full unpack is
     # gigabytes and answers nothing extra.
-    # /etc/alternatives is in this list because the boot splash is selected
-    # through it: default.plymouth is a symlink into it, and without it the
-    # chain dangles and the theme check has nothing to follow.
+    # ALL of /etc, not a list of the bits currently needed. Naming them
+    # individually has now produced the same bug twice: the boot-splash check
+    # could not run because /etc/alternatives was not unpacked, and the
+    # autologin check needs /etc/sddm.conf.d and /etc/passwd, which were not
+    # either. A check that cannot reach its evidence reports a failure about
+    # the image instead of about itself. /etc is a few megabytes; the guessing
+    # is not worth what it saves.
     unsquashfs -d "$TMP/root" -f "$TMP/fs.squashfs" \
-        '/etc/xdg' '/etc/alternatives' '/usr/share/icons/FacetUI' \
-        '/usr/share/color-schemes' \
-        '/usr/share/plasma' '/usr/share/plymouth' '/usr/lib' \
+        '/etc' '/usr/share/icons/FacetUI' '/usr/share/color-schemes' \
+        '/usr/share/plasma' '/usr/share/plymouth' \
+        '/usr/share/wayland-sessions' '/usr/share/xsessions' '/usr/lib' \
         >/dev/null 2>&1 || true
 
     if [ -d "$TMP/root/etc/xdg" ]; then

@@ -171,14 +171,28 @@ if [ "$PROFILE" = desktop ]; then
 
     # Autologin, so the image proves itself without anyone typing a password.
     install -d "$CHROOT/etc/sddm.conf.d"
+    # Session=plasma, NOT plasmawayland. SDDM names a session after its
+    # desktop file, and Plasma 6 ships /usr/share/wayland-sessions/plasma.desktop
+    # -- plasmawayland.desktop was the Plasma 5 name. Naming a session that
+    # does not exist does not produce an error anybody sees: autologin simply
+    # does not happen and SDDM shows its greeter, which on a live image looks
+    # like a wallpaper that never finishes loading. That is what it did.
     cat > "$CHROOT/etc/sddm.conf.d/octagonos.conf" <<'EOF'
 [Autologin]
 User=octagon
-Session=plasmawayland
+Session=plasma
 
 [General]
 DisplayServer=wayland
 EOF
+
+    # And check it, rather than trusting that I got the name right the second
+    # time. The session file has to be there in the image being built.
+    if [ ! -f "$CHROOT/usr/share/wayland-sessions/plasma.desktop" ]; then
+        echo "FATAL: /usr/share/wayland-sessions/plasma.desktop is missing;" >&2
+        echo "       the autologin session name would not resolve." >&2
+        exit 1
+    fi
     # Idempotent, because the chroot is deliberately reused between runs and
     # useradd on an existing user exits non-zero -- which under `set -e` ends
     # the build an hour in, on the one path that was supposed to be the fast
