@@ -39,10 +39,24 @@ sudo apt-get install -y --no-install-recommends \
   debhelper fakeroot lintian dpkg-dev cmake \
   kwin-dev extra-cmake-modules qt6-base-dev \
   libkf6coreaddons-dev libkf6config-dev kf6-ksvg-dev \
-  kf6-kconfig plasma-workspace plymouth \
+  kf6-kconfig \
   libegl1-mesa-dev libgles2-mesa-dev libgl1-mesa-dri \
   gtk-update-icon-cache breeze-icon-theme hicolor-icon-theme
 ```
+
+> **Not `plasma-workspace`.** It is Plasma's *runtime*, nothing in this build
+> uses it, and on a normal Ubuntu machine it cannot be installed alongside
+> apport:
+>
+>     plasma-workspace -> drkonqi -> systemd-coredump
+>
+> `systemd-coredump` and Ubuntu's `apport-core-dump-handler` each *provide
+> and conflict* the virtual package `core-dump-handler`, so only one of them
+> can exist. apt will not quietly remove apport to make room, and gives up
+> with `pkgProblemResolver::Resolve generated breaks`. The build never needed
+> it: it is absent from `debian/Build-Depends`, and the test step is four
+> Python verifiers. `plymouth` went for the same reason — the theme is
+> generated and checked by a Python script, not by Plymouth.
 
 > **This changes your machine.** It adds the neon archive and installs Plasma
 > 6 development packages system-wide. On a machine you use as a KDE desktop,

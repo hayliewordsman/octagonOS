@@ -311,6 +311,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # NOT plasma-workspace: it drags in drkonqi, which hard-depends on
+      # systemd-coredump, which provides-and-conflicts the virtual
+      # core-dump-handler that Ubuntu's apport also provides. On any image
+      # carrying apport the install cannot be resolved at all. Nothing here
+      # used it -- it is not in Build-Depends and the test step is four
+      # Python verifiers -- so it was only ever a latent failure waiting for
+      # a runner with apport on it.
       - name: KWin 6 and the packaging tools, from KDE neon
         run: |
           set -eux
@@ -324,7 +331,7 @@ jobs:
             debhelper fakeroot lintian dpkg-dev cmake \
             kwin-dev extra-cmake-modules qt6-base-dev \
             libkf6coreaddons-dev libkf6config-dev kf6-ksvg-dev \
-            kf6-kconfig plasma-workspace plymouth \
+            kf6-kconfig \
             libegl1-mesa-dev libgles2-mesa-dev libgl1-mesa-dri \
             gtk-update-icon-cache breeze-icon-theme hicolor-icon-theme
           pip install numpy pillow cairosvg
