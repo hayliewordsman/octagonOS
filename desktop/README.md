@@ -25,7 +25,8 @@ actually been *run* rather than verified.
 | [Plasma style](plasma/) | **Built and rendered.** Every surface composited by KSvg and measured: alpha, hairline, corners |
 | [Icon theme](icons/) | **Built and resolved.** 124 names over 8 sizes, each checked against the file it ships, by Qt and by GTK |
 | [Packaging](packaging/) | **Built and installed.** Five `.deb`s, lintian-clean; FacetUI verified to be the default, not an option |
-| [ISO](iso/) | **Built, verified and booted.** 1.7G live image; boots to a Plasma Wayland session that reports FacetUI running |
+| [ISO](iso/) | **Built, verified and booted.** 1.8G live image; boots to a Plasma Wayland session that reports FacetUI running |
+| [Installers](installer/) | **Terminal installer proven; Calamares bundled.** A machine installed by `octagonos-install` was booted and [reported FacetUI running](iso/evidence/installed-selftest-2026-09-19.log). Calamares is configured and checked offline, but nobody has clicked through it |
 
 ## The compositor: KWin/Plasma on Wayland
 

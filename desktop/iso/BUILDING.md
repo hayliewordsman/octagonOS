@@ -142,7 +142,63 @@ has no working OpenGL and the result says nothing about FacetUI. If blur
 loaded and FacetUI's did not, the problem is ours. See
 [`evidence/`](evidence/).
 
-## 8. Write it to a USB stick
+## 7b. Test an install (optional, and slow)
+
+```bash
+sudo desktop/tools/test-install.sh desktop/iso/out/octagonos-desktop.iso
+```
+
+Two phases. It boots the ISO with a blank virtual disk and
+`octagonos.autoinstall=/dev/vda`, which runs the terminal installer
+unattended and powers off; then it boots **that disk**, with no ISO attached,
+and asks KWin what is running on it. In between it checks the things a
+hand-written install forgets -- that the live autologin, `casper.conf` and
+the forced-OpenGL override are gone, and that a kernel is actually in
+`/boot`.
+
+The self-test is added back to the finished disk **from outside**, by the
+harness, because the installer removes it from anything it installs. What
+gets installed is what you would get; the instrumentation is visibly the
+test's.
+
+## 8. Installing it
+
+The image ships two installers.
+
+**Calamares**, the graphical one, is on the live desktop as *Install System*
+and on the desktop of the live session. It asks for the live password
+(`octagon`) through pkexec, because it needs root.
+
+**`octagonos-install`**, from a terminal, for when the desktop does not come
+up or you want it scripted:
+
+```bash
+sudo octagonos-install --disk /dev/sda
+```
+
+It asks for a username and password, shows you what it will erase, and makes
+you type the disk path again before it touches anything. `--unattended` skips
+all of that and is what the test uses.
+
+Both remove the live-image configuration on the way out: the `octagon`
+autologin, `casper`, and the test scaffolding. An installed system that still
+logged itself in as `octagon` would be the bug.
+
+### What is proven, and what is not
+
+`octagonos-install` has been run end to end and the machine it produced was
+booted and checked: see
+[`evidence/installed-selftest-2026-09-19.log`](evidence/installed-selftest-2026-09-19.log).
+
+**Calamares has not.** Its configuration is checked offline --
+`desktop/tools/verify-calamares-config.py` confirms every module in the
+sequence exists, every instance is declared and used, every config file
+parses and the branding names images that are there -- but nobody has clicked
+through it to a finished install. Driving a GUI to completion headlessly is a
+much larger problem than running a script, and I would rather say that than
+imply a wizard has been tested because a script has.
+
+## 9. Write it to a USB stick
 
 ```bash
 lsblk                      # find the stick. Get this wrong and you lose a disk.

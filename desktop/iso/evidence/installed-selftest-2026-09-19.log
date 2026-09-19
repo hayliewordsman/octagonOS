@@ -1,0 +1,11 @@
+OK   render node: /dev/dri/renderD128 
+INFO OpenGL compositing was FORCED (KWIN_COMPOSE=O2ES): this machine
+INFO has no GPU, so frames are drawn by the CPU. The effect running
+INFO here says nothing about how it performs on real hardware.
+OK   compositing: gl2
+OK   facetui-glass is loaded and running
+INFO kwin blur loaded: true
+OK   kdeglobals [Icons] Theme = FacetUI
+OK   plasmarc [Theme] name = FacetUI
+OK   kdeglobals [General] ColorScheme = FacetUI
+END

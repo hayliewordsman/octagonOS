@@ -1,0 +1,31 @@
+[*] examining the installed disk
+  ok    fstab names a root filesystem
+  ok    GRUB is installed
+  ok    grub.cfg was generated
+  ok    a kernel is present
+  ok    the live autologin is gone
+  ok    casper.conf is gone
+  ok    no forced-OpenGL override
+  ok    the test scaffolding was removed by the installer
+[*] and is FacetUI still the default on it?
+    [*] what a user with an empty home directory gets
+      ok    kdeglobals [Icons] Theme = FacetUI
+      ok    kdeglobals [General] ColorScheme = FacetUI
+      ok    kdeglobals [KDE] LookAndFeelPackage = dev.octagonos.facetui
+      ok    plasmarc   [Theme] name = FacetUI
+      ok    kwinrc     [Plugins] facetui-glassEnabled = true
+      ok    kwinrc     [Plugins] blurEnabled = true
+    [*] and the resources those names resolve to
+      ok    /usr/share/icons/FacetUI/index.theme
+      ok    /usr/share/color-schemes/FacetUI.colors
+      ok    /usr/share/plasma/desktoptheme/FacetUI/metadata.json
+      ok    /usr/share/plasma/look-and-feel/dev.octagonos.facetui/metadata.json
+      ok    /usr/share/plymouth/themes/octagonos/octagonos.plymouth
+      ok    the KWin effect plugin is installed
+    [*] the live-session configuration, which must be GONE
+      ok    /etc/sddm.conf.d/octagonos.conf is gone
+      ok    /etc/casper.conf is gone
+    [*] the boot splash
+      ok    default.plymouth points at octagonos
+    
+    FacetUI is the default: a new user gets it without choosing anything.
