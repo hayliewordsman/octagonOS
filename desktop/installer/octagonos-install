@@ -25,6 +25,15 @@
 
 set -euo pipefail
 
+# SAY WHICH COMMAND DIED.
+#
+# `set -e` exits silently, and the first time this ran unattended it printed
+# "partitioning /dev/vda" and then nothing at all -- a failure with no line,
+# no command and no status, inside a virtual machine that had already powered
+# itself off by the time anyone looked. An installer is exactly the wrong
+# place to have to guess from.
+trap 'rc=$?; echo "[FAIL] line $LINENO: \`$BASH_COMMAND\` exited $rc" >&2' ERR
+
 DISK=""
 HOSTNAME_NEW="octagonos"
 USER_NEW=""

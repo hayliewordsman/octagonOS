@@ -9,6 +9,12 @@ Wants=local-fs.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+# systemd's default start timeout is 90 seconds. Copying several gigabytes
+# onto a virtual disk under software emulation takes very much longer than
+# that, and when the timeout fires systemd kills the whole cgroup -- which
+# would look exactly like the installer failing, for a reason nothing in its
+# own output could explain.
+TimeoutStartSec=infinity
 ExecStart=/usr/lib/octagonos/octagonos-autoinstall.sh
 StandardOutput=journal
 

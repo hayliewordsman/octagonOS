@@ -24,9 +24,18 @@
 set -u
 
 ROOT=""
-if [ "${1:-}" = "--root" ]; then
-    ROOT="${2:?--root needs a directory}"
-fi
+INSTALLED=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --root)      ROOT="${2:?--root needs a directory}"; shift 2 ;;
+        # An installed system, not a live image. The autologin and
+        # live-session checks below are inverted there: a machine that still
+        # autologins as `octagon` after being installed is the bug, not the
+        # pass. Everything about FacetUI being the default still applies.
+        --installed) INSTALLED=1; shift ;;
+        *) shift ;;
+    esac
+done
 
 command -v kreadconfig6 >/dev/null || {
     echo "[FAIL] kreadconfig6 is not installed; cannot resolve settings the"
@@ -131,6 +140,17 @@ fi
 # Neither the packaging checks nor the ISO content checks could see this:
 # every file was present and correct, and the fault was a name in a config
 # referring to a file that was never looked for. So it is looked for here.
+if [ "$INSTALLED" -eq 1 ]; then
+    echo "[*] the live-session configuration, which must be GONE"
+    for f in /etc/sddm.conf.d/octagonos.conf /etc/casper.conf; do
+        if [ -e "$ROOT$f" ]; then
+            echo "  FAIL  $f is still present on an installed system"; fail=1
+        else
+            echo "  ok    $f is gone"
+        fi
+    done
+else
+
 echo "[*] the session autologin asks for"
 sddm_conf="$ROOT/etc/sddm.conf.d/octagonos.conf"
 if [ ! -f "$sddm_conf" ]; then
@@ -279,6 +299,8 @@ else
             fi
         fi
     fi
+fi
+
 fi
 
 echo "[*] the boot splash"

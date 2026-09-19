@@ -25,11 +25,29 @@ done
 
 say "installing to $TARGET_DISK"
 
-if /usr/bin/octagonos-install --unattended --disk "$TARGET_DISK" \
-        --hostname octagonos --user octagon --password octagon > "$OUT" 2>&1; then
+# TRACE TO A FILE, THEN REPLAY IT.
+#
+# Writing the installer's output straight at the serial console lost it: the
+# first three failures showed "partitioning /dev/vda" and then nothing --
+# no error, no line number, no exit status -- on a machine that powers itself
+# off before anybody can look. Whether that was interleaving with systemd's
+# own console writes or output still buffered when the process died, the fix
+# is the same: capture to a file that survives, then replay it deliberately.
+#
+# `bash -x` because a shell script that dies under `set -e` says nothing about
+# which command did it, and this one is running where nobody can watch.
+LOG=/run/octagonos-install.trace
+rc=0
+bash -x /usr/bin/octagonos-install --unattended --disk "$TARGET_DISK" \
+    --hostname octagonos --user octagon --password octagon > "$LOG" 2>&1 || rc=$?
+
+if [ "$rc" -eq 0 ]; then
     say "OK   the installer finished"
+    tail -5 "$LOG" | while IFS= read -r l; do say "log| $l"; done
 else
-    say "FAIL the installer exited non-zero"
+    say "FAIL the installer exited $rc"
+    say "---- the last 60 traced commands ----"
+    tail -60 "$LOG" | while IFS= read -r l; do say "log| $l"; done
 fi
 
 say "END"

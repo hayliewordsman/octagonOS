@@ -376,8 +376,16 @@ cp "$CHROOT"/boot/vmlinuz-*  "$IMAGE/casper/vmlinuz"
 cp "$CHROOT"/boot/initrd.img-* "$IMAGE/casper/initrd"
 
 say "squashing the filesystem (this is the slow part)"
+# /boot IS INCLUDED, and excluding it was a real bug.
+#
+# The live image boots the kernel from /casper on the ISO, so /boot inside
+# the squashfs looked like pure duplication and was excluded to save ~120M.
+# But the installer copies the squashfs onto a disk, and a system with no
+# /boot/vmlinuz has no kernel: grub-install succeeds, update-grub writes a
+# menu with nothing in it, and the machine is unbootable in a way that only
+# shows up after the install finishes and reports success.
 mksquashfs "$CHROOT" "$IMAGE/casper/filesystem.squashfs" \
-    -noappend -comp xz -e boot
+    -noappend -comp xz
 printf '%s' "$(du -sx --block-size=1 "$CHROOT" | cut -f1)" \
     > "$IMAGE/casper/filesystem.size"
 

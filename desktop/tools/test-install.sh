@@ -109,13 +109,32 @@ done
 sleep 10
 kill "$QPID" 2>/dev/null; wait "$QPID" 2>/dev/null; QPID=""
 
+# SAVE THE LOG BEFORE JUDGING IT. The first run of this script failed in
+# phase 1 and deleted its own evidence: the serial log lived in $WORK, the
+# exit path ran before the copy at the end, and the trap removed it. The
+# installer's own output was in there, and the only thing printed was that it
+# had exited non-zero.
+OUTDIR="$(dirname "$ISO")"
+cp "$SERIAL1" "$OUTDIR/install-phase1.log" 2>/dev/null
+
 echo
-grep "OCTAGONOS-INSTALL:" "$SERIAL1" 2>/dev/null | sed 's/OCTAGONOS-INSTALL: /  /' \
-    || { echo "[FAIL] the installer never reported. Last serial output:"
-         tail -25 "$SERIAL1" 2>/dev/null | sed 's/^/       /'; exit 1; }
+if ! grep -q "OCTAGONOS-INSTALL:" "$SERIAL1" 2>/dev/null; then
+    echo "[FAIL] the installer never reported. Last serial output:"
+    tail -30 "$SERIAL1" 2>/dev/null | sed 's/^/       /'
+    echo "       full log: $OUTDIR/install-phase1.log"
+    exit 1
+fi
+grep "OCTAGONOS-INSTALL:" "$SERIAL1" | sed 's/OCTAGONOS-INSTALL: /  /'
 
 if grep -q "OCTAGONOS-INSTALL: FAIL" "$SERIAL1"; then
-    echo "[FAIL] the installer reported failure"; exit 1
+    echo
+    echo "[FAIL] the installer reported failure. What it printed before dying:"
+    # Its own output is on the same console, untagged, so show the tail rather
+    # than only the lines that happen to carry the marker.
+    grep -v '^\[  *OK  *\]\|^\[FAILED\]\|Starting \|Started \|Stopping \|Stopped ' \
+        "$SERIAL1" 2>/dev/null | tail -30 | sed 's/^/       /'
+    echo "       full log: $OUTDIR/install-phase1.log"
+    exit 1
 fi
 
 # --- between: is there actually a system on this disk? -----------------------
@@ -123,9 +142,24 @@ fi
 echo
 echo "[*] examining the installed disk"
 LOOP="$(losetup --find --show -P "$DISK")"
-sleep 1
+
+# Wait for the partition nodes, rather than assuming they are there. losetup
+# -P asks the kernel to scan, udev creates the nodes, and neither has
+# finished when losetup returns -- a race that reads as "the installer made
+# no partitions" when the installer made them correctly.
 ROOTPART="${LOOP}p2"
-[ -b "$ROOTPART" ] || { echo "[FAIL] no second partition on the disk"; exit 1; }
+for _ in $(seq 1 30); do
+    [ -b "$ROOTPART" ] && break
+    partx -a "$LOOP" >/dev/null 2>&1 || true
+    udevadm settle >/dev/null 2>&1 || true
+    sleep 1
+done
+if [ ! -b "$ROOTPART" ]; then
+    echo "[FAIL] no second partition on the disk. What is actually on it:"
+    sgdisk -p "$DISK" 2>&1 | sed 's/^/       /'
+    ls -la "${LOOP}"* 2>&1 | sed 's/^/       /'
+    exit 1
+fi
 
 mkdir -p "$MNT"
 mount "$ROOTPART" "$MNT" || { echo "[FAIL] the root filesystem will not mount"; exit 1; }
@@ -156,7 +190,8 @@ ok "the test scaffolding was removed by the installer"
 # FacetUI must still be the default on the installed system.
 if [ -x "$HERE/check-facetui-defaults.sh" ]; then
     echo "[*] and is FacetUI still the default on it?"
-    "$HERE/check-facetui-defaults.sh" --root "$MNT" 2>&1 | sed 's/^/    /' || fail=1
+    "$HERE/check-facetui-defaults.sh" --root "$MNT" --installed 2>&1 \
+        | sed 's/^/    /' || fail=1
 fi
 
 [ "$fail" -eq 0 ] || { echo; echo "FAILED: the installed disk is not right"; exit 1; }
@@ -227,8 +262,6 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
 done
 kill "$QPID" 2>/dev/null; wait "$QPID" 2>/dev/null; QPID=""
 
-OUTDIR="$(dirname "$ISO")"
-cp "$SERIAL1" "$OUTDIR/install-phase1.log" 2>/dev/null
 cp "$SERIAL2" "$OUTDIR/install-phase2.log" 2>/dev/null
 
 echo
