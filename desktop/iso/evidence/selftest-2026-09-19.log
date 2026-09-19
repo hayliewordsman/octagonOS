@@ -1,4 +1,4 @@
-octagonos login: OK   render node: /dev/dri/renderD128 
+OK   render node: /dev/dri/renderD128 
 INFO OpenGL compositing was FORCED (KWIN_COMPOSE=O2ES): this machine
 INFO has no GPU, so frames are drawn by the CPU. The effect running
 INFO here says nothing about how it performs on real hardware.

@@ -28,15 +28,26 @@ The single largest risk was retired late: **both AGSL shaders now compile**
 under Skia's own SkSL compiler, offline. That was the one failure that would
 have surfaced as a blank screen after a multi-hour build.
 
-On the desktop side, four things *have* run. The
-[Plymouth boot splash](desktop/plymouth/) was installed against a real
+**The desktop edition boots.** A live ISO was built, and on booting it KWin
+reported `facetui-glass is loaded and running` on an OpenGL scene, with its
+own blur loaded beside it as a control and all three FacetUI theme keys in
+force — the full report is in
+[`desktop/iso/evidence/`](desktop/iso/evidence/). Two qualifications travel
+with that, and the evidence README leads with them rather than burying them:
+the test machine has no GPU, so OpenGL had to be **forced** (Mesa's software
+rasteriser tells KWin not to use it, and KWin then loads no OpenGL effect at
+all), and every frame was drawn by the CPU; and it proves the effect *runs*,
+not that the glass *looks right* — QEMU cannot photograph the guest's Wayland
+output, so no picture was taken. Appearance is settled offline instead.
+
+The [Plymouth boot splash](desktop/plymouth/) was installed against a real
 `plymouthd`, driven with real keystrokes and screenshotted — including the
 encrypted-disk passphrase path, which is the part of a boot theme that ruins a
 machine when it is wrong. The [KWin glass effect](desktop/kwin/) compiles
-against KWin 6.7.5 and is accepted by KWin as a plugin, and its shader is
-checked against `shared/facetui/facet_math.py` to 1.7e-07 in a real GL driver
-— so the boot screen, the shade, the app icons and now the desktop's panels
-are provably lit by one piece of maths.
+against KWin 6.7.5, and its shader is checked against
+`shared/facetui/facet_math.py` to 1.7e-07 in a real GL driver — so the boot
+screen, the shade, the app icons and now the desktop's panels are provably lit
+by one piece of maths.
 
 Both were written, read carefully, and still wrong in ways only running them
 showed — a theme that drew its background and stopped, sprites silently
