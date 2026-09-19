@@ -324,7 +324,7 @@ jobs:
             debhelper fakeroot lintian dpkg-dev cmake \
             kwin-dev extra-cmake-modules qt6-base-dev \
             libkf6coreaddons-dev libkf6config-dev kf6-ksvg-dev \
-            kf6-kconfig-bin plasma-workspace plymouth \
+            kf6-kconfig plasma-workspace plymouth \
             libegl1-mesa-dev libgles2-mesa-dev libgl1-mesa-dri \
             gtk-update-icon-cache breeze-icon-theme hicolor-icon-theme
           pip install numpy pillow cairosvg
@@ -344,3 +344,16 @@ jobs:
       # THE question: installed, or actually in use? Resolved the way a Plasma
       # component resolves it, as a user with an empty home directory.
       - run: desktop/tools/check-facetui-defaults.sh
+
+  selftest-verdict:
+    name: The boot verdict says what the evidence supports
+    runs-on: ubuntu-latest
+    # No image and no virtual machine: this reads serial logs as text. It is
+    # here because the verdict logic was wrong in the worst available way --
+    # handed a boot that failed before graphics were ever checked, it reported
+    # that OpenGL compositing was working and blamed FacetUI. It could say
+    # that because the only way to run it was to boot a VM for half an hour,
+    # so nobody ever did. Now it takes a second.
+    steps:
+      - uses: actions/checkout@v4
+      - run: desktop/tools/test-judge-selftest.sh
