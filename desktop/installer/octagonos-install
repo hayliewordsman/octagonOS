@@ -1,0 +1,279 @@
+#!/bin/bash
+#
+# Install octagonOS from a running live session onto a disk.
+#
+#     octagonos-install [--disk /dev/sdX] [--hostname NAME] [--user NAME]
+#                       [--password PASS] [--unattended] [--keep-octagon]
+#
+# WHY A SCRIPT AND NOT ONLY CALAMARES
+#
+# Calamares is on the image and is what most people should use. This exists
+# because it can be DRIVEN: given --unattended it installs without a human,
+# which is what lets the build boot a virtual machine, install to a virtual
+# disk, boot THAT disk, and check the result. An installer nobody has run to
+# completion is not an installer, and a graphical one cannot be run to
+# completion by a test. So this is the one with proof behind it.
+#
+# It is also the answer when the live desktop does not come up at all, which
+# on unfamiliar graphics is exactly when you still want to install.
+#
+# WHAT IT REFUSES TO DO
+#
+# It will not touch the disk the live session booted from, and it will not
+# proceed without either an explicit confirmation or --unattended. Beyond
+# that it is destructive by design: it repartitions the disk it is given.
+
+set -euo pipefail
+
+DISK=""
+HOSTNAME_NEW="octagonos"
+USER_NEW=""
+PASS_NEW=""
+UNATTENDED=0
+KEEP_OCTAGON=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --disk)        DISK="$2"; shift 2 ;;
+        --hostname)    HOSTNAME_NEW="$2"; shift 2 ;;
+        --user)        USER_NEW="$2"; shift 2 ;;
+        --password)    PASS_NEW="$2"; shift 2 ;;
+        --unattended)  UNATTENDED=1; shift ;;
+        --keep-octagon) KEEP_OCTAGON=1; shift ;;
+        -h|--help)     sed -n '2,25p' "$0" | sed 's/^# \?//'; exit 0 ;;
+        *) echo "unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+say()  { echo "[*] $*"; }
+die()  { echo "[FAIL] $*" >&2; exit 1; }
+
+[ "$(id -u)" -eq 0 ] || die "this needs root"
+
+TARGET=/target
+SQUASH=/cdrom/casper/filesystem.squashfs
+SRC_MNT=/run/octagonos-install-src
+
+# --- what we are installing ONTO ---------------------------------------------
+
+# The device the live medium is on. Installing over the disk you booted from
+# removes the filesystem being copied, halfway through copying it.
+live_device() {
+    local src
+    src="$(findmnt -n -o SOURCE /cdrom 2>/dev/null || true)"
+    [ -n "$src" ] || src="$(findmnt -n -o SOURCE /run/live/medium 2>/dev/null || true)"
+    [ -n "$src" ] || return 0
+    lsblk -no PKNAME "$src" 2>/dev/null | head -1 | sed 's|^|/dev/|'
+}
+
+if [ -z "$DISK" ]; then
+    [ "$UNATTENDED" -eq 1 ] && die "--unattended needs --disk"
+    echo
+    lsblk -dno NAME,SIZE,MODEL | sed 's|^|  /dev/|'
+    echo
+    read -r -p "Install to which disk? (e.g. /dev/sda) " DISK
+fi
+
+[ -b "$DISK" ] || die "$DISK is not a block device"
+
+LIVE_DISK="$(live_device || true)"
+if [ -n "$LIVE_DISK" ] && [ "$LIVE_DISK" = "$DISK" ]; then
+    die "$DISK is the disk this live session booted from"
+fi
+
+# --- who will use it ---------------------------------------------------------
+
+if [ -z "$USER_NEW" ]; then
+    if [ "$UNATTENDED" -eq 1 ]; then
+        USER_NEW=octagon
+        KEEP_OCTAGON=1
+    else
+        read -r -p "Username for the installed system: " USER_NEW
+    fi
+fi
+[ -n "$USER_NEW" ] || die "a username is required"
+
+if [ -z "$PASS_NEW" ] && [ "$UNATTENDED" -eq 0 ]; then
+    read -r -s -p "Password for $USER_NEW: " PASS_NEW; echo
+    read -r -s -p "Again: " PASS_CHECK; echo
+    [ "$PASS_NEW" = "$PASS_CHECK" ] || die "passwords do not match"
+fi
+[ -n "$PASS_NEW" ] || PASS_NEW="$USER_NEW"
+
+# --- firmware ---------------------------------------------------------------
+#
+# Which bootloader gets installed is decided by how THIS machine booted, not
+# by a flag: a UEFI machine that boots the live image through its firmware
+# needs an EFI bootloader, and guessing wrong produces a disk that installs
+# cleanly and does not boot.
+if [ -d /sys/firmware/efi ]; then FIRMWARE=uefi; else FIRMWARE=bios; fi
+say "firmware: $FIRMWARE"
+
+if [ "$UNATTENDED" -eq 0 ]; then
+    echo
+    echo "This ERASES $DISK ($(lsblk -dno SIZE "$DISK" | tr -d ' ')) completely."
+    read -r -p "Type the disk path again to confirm: " CONFIRM
+    [ "$CONFIRM" = "$DISK" ] || die "not confirmed"
+fi
+
+# --- partition ---------------------------------------------------------------
+
+say "partitioning $DISK"
+wipefs -a "$DISK" >/dev/null
+sgdisk --zap-all "$DISK" >/dev/null 2>&1 || true
+
+if [ "$FIRMWARE" = uefi ]; then
+    sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI"  "$DISK" >/dev/null
+    sgdisk -n 2:0:0     -t 2:8300 -c 2:"root" "$DISK" >/dev/null
+else
+    # A 1 MiB BIOS boot partition, because the disk is GPT: GRUB's core image
+    # has nowhere to live on GPT otherwise, and grub-install fails with
+    # "embedding is not possible" rather than producing a broken disk quietly.
+    sgdisk -n 1:0:+1M   -t 1:ef02 -c 1:"bios" "$DISK" >/dev/null
+    sgdisk -n 2:0:0     -t 2:8300 -c 2:"root" "$DISK" >/dev/null
+fi
+partprobe "$DISK" 2>/dev/null || true
+udevadm settle 2>/dev/null || true
+sleep 2
+
+# nvme0n1 partitions are nvme0n1p1; sda partitions are sda1.
+case "$DISK" in
+    *[0-9]) P1="${DISK}p1"; P2="${DISK}p2" ;;
+    *)      P1="${DISK}1";  P2="${DISK}2"  ;;
+esac
+
+say "making filesystems"
+if [ "$FIRMWARE" = uefi ]; then
+    mkfs.vfat -F32 -n OCTAGON-EFI "$P1" >/dev/null
+fi
+mkfs.ext4 -F -L octagonos "$P2" >/dev/null
+
+mkdir -p "$TARGET"
+mount "$P2" "$TARGET"
+if [ "$FIRMWARE" = uefi ]; then
+    mkdir -p "$TARGET/boot/efi"
+    mount "$P1" "$TARGET/boot/efi"
+fi
+
+# --- copy the system ---------------------------------------------------------
+#
+# From the squashfs, not from /. The live root is a union of the squashfs and
+# whatever this session has written since boot -- logs, caches, the overlay's
+# own scratch -- and none of that belongs on a fresh install.
+if [ -f "$SQUASH" ]; then
+    say "copying the system from the squashfs"
+    mkdir -p "$SRC_MNT"
+    mountpoint -q "$SRC_MNT" || mount -o loop,ro "$SQUASH" "$SRC_MNT"
+    rsync -aHAX --numeric-ids "$SRC_MNT/" "$TARGET/"
+    umount "$SRC_MNT" || true
+else
+    say "no squashfs found; copying the live root instead"
+    rsync -aHAX --numeric-ids \
+        --exclude=/proc --exclude=/sys --exclude=/dev --exclude=/run \
+        --exclude=/tmp --exclude=/mnt --exclude=/media --exclude=/cdrom \
+        --exclude=/target --exclude=/lost+found \
+        / "$TARGET/"
+fi
+
+# --- describe the disk to itself ---------------------------------------------
+
+say "writing fstab"
+ROOT_UUID="$(blkid -s UUID -o value "$P2")"
+{
+    echo "# octagonOS, written by octagonos-install"
+    echo "UUID=$ROOT_UUID  /  ext4  errors=remount-ro  0 1"
+    if [ "$FIRMWARE" = uefi ]; then
+        echo "UUID=$(blkid -s UUID -o value "$P1")  /boot/efi  vfat  umask=0077  0 1"
+    fi
+} > "$TARGET/etc/fstab"
+
+echo "$HOSTNAME_NEW" > "$TARGET/etc/hostname"
+cat > "$TARGET/etc/hosts" <<EOF
+127.0.0.1	localhost
+127.0.1.1	$HOSTNAME_NEW
+::1	localhost ip6-localhost ip6-loopback
+EOF
+
+# --- enter it ----------------------------------------------------------------
+
+for d in dev dev/pts proc sys; do
+    mkdir -p "$TARGET/$d"
+    mountpoint -q "$TARGET/$d" || mount --bind "/$d" "$TARGET/$d"
+done
+if [ "$FIRMWARE" = uefi ] && [ -d /sys/firmware/efi/efivars ]; then
+    mkdir -p "$TARGET/sys/firmware/efi/efivars"
+    mountpoint -q "$TARGET/sys/firmware/efi/efivars" \
+        || mount --bind /sys/firmware/efi/efivars "$TARGET/sys/firmware/efi/efivars"
+fi
+
+cleanup() {
+    for d in sys/firmware/efi/efivars sys proc dev/pts dev; do
+        mountpoint -q "$TARGET/$d" && umount -l "$TARGET/$d" || true
+    done
+    mountpoint -q "$TARGET/boot/efi" && umount "$TARGET/boot/efi" || true
+    mountpoint -q "$TARGET" && umount "$TARGET" || true
+}
+trap cleanup EXIT
+
+in_target() { chroot "$TARGET" /usr/bin/env DEBIAN_FRONTEND=noninteractive \
+                  LC_ALL=C.UTF-8 "$@"; }
+
+# --- stop it being a live image ----------------------------------------------
+#
+# This is the part a hand-written install forgets, and forgetting it leaves a
+# permanent machine that logs itself in as a published username with a
+# published password.
+say "removing the live-session configuration"
+
+# casper's hooks rebuild the initramfs for live booting. On a disk they are
+# wrong, and its autologin machinery is not wanted either.
+in_target apt-get purge -y casper >/dev/null 2>&1 || true
+rm -f "$TARGET/etc/casper.conf"
+
+# The image autologins as octagon. An installed system must not.
+rm -f "$TARGET/etc/sddm.conf.d/octagonos.conf"
+
+# The self-test and the OpenGL override are inert without their kernel flags,
+# but they are test scaffolding and have no business on somebody's computer.
+in_target systemctl disable octagonos-selftest.service >/dev/null 2>&1 || true
+in_target systemctl disable octagonos-forcegl.service  >/dev/null 2>&1 || true
+in_target systemctl disable octagonos-autoinstall.service >/dev/null 2>&1 || true
+rm -f "$TARGET/etc/systemd/system/octagonos-selftest.service" \
+      "$TARGET/etc/systemd/system/octagonos-forcegl.service" \
+      "$TARGET/etc/systemd/system/octagonos-autoinstall.service"
+# /etc/environment may carry KWIN_COMPOSE from a forced-OpenGL live boot.
+sed -i '/^KWIN_COMPOSE=/d; /^KWIN_DRM_NO_AMS=/d' "$TARGET/etc/environment" 2>/dev/null || true
+
+# --- the person who will use it ----------------------------------------------
+
+say "creating $USER_NEW"
+if ! in_target id -u "$USER_NEW" >/dev/null 2>&1; then
+    in_target useradd -m -s /bin/bash -G sudo,audio,video,plugdev "$USER_NEW"
+fi
+echo "$USER_NEW:$PASS_NEW" | in_target chpasswd
+
+if [ "$USER_NEW" != octagon ] && [ "$KEEP_OCTAGON" -eq 0 ]; then
+    in_target userdel -r octagon >/dev/null 2>&1 || true
+fi
+
+# --- make it bootable --------------------------------------------------------
+
+say "installing GRUB ($FIRMWARE)"
+if [ "$FIRMWARE" = uefi ]; then
+    in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+        --bootloader-id=octagonOS --recheck >/dev/null
+    # Also as the removable-media path. Firmware that ignores NVRAM entries --
+    # and a disk moved to another machine -- boots \EFI\BOOT\BOOTX64.EFI or
+    # nothing at all.
+    mkdir -p "$TARGET/boot/efi/EFI/BOOT"
+    cp "$TARGET/boot/efi/EFI/octagonOS/grubx64.efi" \
+       "$TARGET/boot/efi/EFI/BOOT/BOOTX64.EFI"
+else
+    in_target grub-install --target=i386-pc --recheck "$DISK" >/dev/null
+fi
+
+in_target update-grub >/dev/null 2>&1
+in_target update-initramfs -u -k all >/dev/null 2>&1
+
+say "done: octagonOS is installed on $DISK"
+say "reboot, and remove the installation medium"

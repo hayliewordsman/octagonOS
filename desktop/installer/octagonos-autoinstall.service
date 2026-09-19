@@ -1,0 +1,16 @@
+[Unit]
+Description=octagonOS: unattended install, for the build's acceptance test
+ConditionKernelCommandLine=octagonos.autoinstall
+# The live session does not need to be up -- this writes a disk, it does not
+# need a desktop -- but the filesystems it copies from must be mounted.
+After=local-fs.target
+Wants=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/octagonos/octagonos-autoinstall.sh
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target

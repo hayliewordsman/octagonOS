@@ -169,6 +169,56 @@ if [ "$PROFILE" = desktop ]; then
         'apt-get install -y --reinstall --no-install-recommends /tmp/debs/*.deb'
     rm -rf "$CHROOT/tmp/debs"
 
+    # --- the installers ----------------------------------------------------
+    #
+    # Two of them, because they answer different needs. Calamares is the
+    # graphical one and is what most people should use. octagonos-install is
+    # a script, and it is the one with proof behind it: given --unattended it
+    # can be DRIVEN, which is what lets this build install to a virtual disk,
+    # boot that disk and check the result. An installer nobody has run to
+    # completion is not an installer, and a test cannot click through a
+    # wizard. It is also the answer when the live desktop does not come up,
+    # which on unfamiliar graphics is exactly when you still want to install.
+    say "installing the installers"
+    in_chroot apt-get install -y --no-install-recommends \
+        calamares \
+        grub2-common grub-efi-amd64-bin grub-pc-bin efibootmgr \
+        dosfstools rsync squashfs-tools gdisk parted os-prober
+
+    # GRUB HAS TO BE IN THE IMAGE, not fetched during the install. An
+    # installer that needs the network to make a disk bootable fails on the
+    # machine that most needs installing -- the one with no working network
+    # until it has an operating system on it.
+    for b in /usr/sbin/grub-install /usr/lib/grub/x86_64-efi /usr/lib/grub/i386-pc; do
+        [ -e "$CHROOT$b" ] || { echo "FATAL: $b missing; installs cannot boot" >&2; exit 1; }
+    done
+
+    install -D -m 755 "$HERE/../installer/octagonos-install" \
+        "$CHROOT/usr/bin/octagonos-install"
+
+    # Calamares is configured entirely from here: the neon package ships the
+    # installer and no configuration at all.
+    install -d "$CHROOT/etc/calamares/modules"
+    install -m 644 "$HERE/../installer/calamares/settings.conf" \
+        "$CHROOT/etc/calamares/settings.conf"
+    install -m 644 "$HERE/../installer/calamares"/modules/*.conf \
+        "$CHROOT/etc/calamares/modules/"
+
+    # The branding artwork is generated, not committed, so the installer's
+    # octagon cannot drift from the boot splash's and the icon theme's.
+    python3 "$HERE/../installer/make-branding.py" >/dev/null
+    install -d "$CHROOT/usr/share/calamares/branding/octagonos"
+    install -m 644 "$HERE/../installer/calamares/branding/octagonos"/* \
+        "$CHROOT/usr/share/calamares/branding/octagonos/"
+
+    # And the unattended path, for the acceptance test. Inert without
+    # octagonos.autoinstall= on the kernel command line.
+    install -D -m 755 "$HERE/../installer/octagonos-autoinstall.sh" \
+        "$CHROOT/usr/lib/octagonos/octagonos-autoinstall.sh"
+    install -D -m 644 "$HERE/../installer/octagonos-autoinstall.service" \
+        "$CHROOT/etc/systemd/system/octagonos-autoinstall.service"
+    in_chroot systemctl enable octagonos-autoinstall.service
+
     # Autologin, so the image proves itself without anyone typing a password.
     install -d "$CHROOT/etc/sddm.conf.d"
     # Session=plasma, NOT plasmawayland. SDDM names a session after its
@@ -271,6 +321,15 @@ EOF
         in_chroot useradd -m -s /bin/bash -G sudo octagon
     fi
     in_chroot sh -c 'echo "octagon:octagon" | chpasswd'
+
+    # The installer, where somebody looks for it. A live image whose installer
+    # is only in the application menu is one people conclude cannot install.
+    in_chroot install -d -o octagon -g octagon /home/octagon/Desktop
+    if [ -f "$CHROOT/usr/share/applications/calamares.desktop" ]; then
+        in_chroot install -m 755 -o octagon -g octagon \
+            /usr/share/applications/calamares.desktop \
+            /home/octagon/Desktop/install-octagonos.desktop
+    fi
 
     # The self-test. Inert unless octagonos.selftest is on the kernel command
     # line, so it ships without running: a user whose machine looks wrong can

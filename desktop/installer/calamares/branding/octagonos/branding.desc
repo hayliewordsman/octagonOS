@@ -1,0 +1,39 @@
+---
+componentName: octagonos
+
+welcomeStyleCalamares: false
+welcomeExpandingLogo: true
+
+windowExpanding: normal
+windowSize: 900px,560px
+windowPlacement: center
+
+sidebar: widget
+navigation: widget
+
+strings:
+    productName:         octagonOS
+    shortProductName:    octagonOS
+    version:             beta 1
+    shortVersion:        beta
+    versionedName:       octagonOS beta 1
+    shortVersionedName:  octagonOS beta
+    bootloaderEntryName: octagonOS
+    productUrl:          https://github.com/hayliewordsman/octagonOS
+    supportUrl:          https://github.com/hayliewordsman/octagonOS/issues
+    knownIssuesUrl:      https://github.com/hayliewordsman/octagonOS/issues
+    releaseNotesUrl:     https://github.com/hayliewordsman/octagonOS/releases
+
+images:
+    productLogo:    "logo.png"
+    productIcon:    "icon.png"
+    productWelcome: "welcome.png"
+
+# No stylesheet and no custom colours on purpose.
+#
+# Calamares is a Qt application, and this image ships FacetUI as the system
+# Plasma style and colour scheme. Left alone, the installer is themed by the
+# desktop it is installing -- which is both less code and a more honest
+# preview than a palette hand-copied in here and left to drift.
+slideshow: "show.qml"
+slideshowAPI: 2
