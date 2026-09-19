@@ -202,6 +202,18 @@ else
                 /*) ccpath="$ccbin" ;;
                 *)  ccpath="/usr/bin/$ccbin" ;;
             esac
+            # If the directory itself is absent, this root is incomplete and
+            # the honest answer is that the CHECK cannot see the binary --
+            # not that the image lacks it. Three separate findings in this
+            # file have now turned out to be a partial unpack rather than a
+            # fault in the image, and each one cost a rebuild to disbelieve.
+            if [ -n "$ROOT" ] && [ ! -d "$ROOT$(dirname "$ccpath")" ]; then
+                echo "  ERROR $ROOT$(dirname "$ccpath") is not in this root, so"
+                echo "        whether '$ccbin' is installed cannot be seen from"
+                echo "        here. This is a fault in the checker's inputs, not"
+                echo "        a finding about the image. Refusing to report one."
+                exit 3
+            fi
             if [ -x "$ROOT$ccpath" ]; then
                 echo "  ok    wayland compositor $ccbin is present"
             else

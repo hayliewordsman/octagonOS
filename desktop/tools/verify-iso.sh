@@ -102,7 +102,7 @@ else
     # the image instead of about itself. /etc is a few megabytes; the guessing
     # is not worth what it saves.
     unsquashfs -d "$TMP/root" -f "$TMP/fs.squashfs" \
-        '/etc' '/usr/share/icons/FacetUI' '/usr/share/color-schemes' \
+        '/etc' '/usr/bin' '/usr/share/icons/FacetUI' '/usr/share/color-schemes' \
         '/usr/share/plasma' '/usr/share/plymouth' \
         '/usr/share/wayland-sessions' '/usr/share/xsessions' '/usr/lib' \
         >/dev/null 2>&1 || true
