@@ -184,6 +184,62 @@ else
         fi
     fi
 
+    # NOTHING MAY OVERRIDE THIS CONFIG AT BOOT.
+    #
+    # sddm.conf(5): the load order is /usr/lib/sddm/sddm.conf.d, then
+    # /etc/sddm.conf.d, then /etc/sddm.conf, "with the latter having highest
+    # precedence". So a plain /etc/sddm.conf beats everything checked above.
+    #
+    # casper writes exactly that file, from its initramfs, at every boot --
+    # which means an image can be unpacked and inspected and look completely
+    # correct while the booted machine does something else. Three boots were
+    # spent on that. The file does not exist to be found at build time; the
+    # SCRIPT that creates it does, so that is what is checked.
+    if [ -f "$ROOT/etc/sddm.conf" ]; then
+        echo "  FAIL  /etc/sddm.conf exists and outranks /etc/sddm.conf.d;"
+        echo "        whatever it says is what SDDM will do"
+        fail=1
+    else
+        echo "  ok    no /etc/sddm.conf to outrank the settings above"
+    fi
+
+    casper_al="$ROOT/usr/share/initramfs-tools/scripts/casper-bottom/15autologin"
+    if [ -f "$casper_al" ]; then
+        echo "  FAIL  casper's 15autologin is still in this image. It writes"
+        echo "        /etc/sddm.conf at boot -- User=\$USERNAME and a session"
+        echo "        name it can only find among X11 sessions -- and that file"
+        echo "        outranks everything above. On a Wayland image it leaves"
+        echo "        Session= empty, and SDDM shows its greeter instead."
+        fail=1
+    elif [ -d "$ROOT/usr/share/initramfs-tools/scripts/casper-bottom" ]; then
+        echo "  ok    casper's 15autologin is not in the image to override this"
+    elif [ -n "$ROOT" ]; then
+        # Say so out loud. Silently skipping is how this check sat inert on
+        # the one path it was written for: the directory was simply not in
+        # the unpack, so the `elif` above was false and nothing printed at
+        # all -- a check that neither passes nor fails and is easy to read
+        # as a pass.
+        echo "  ERROR casper-bottom is not in this root, so whether casper"
+        echo "        would override the autologin config cannot be seen from"
+        echo "        here. A fault in the checker's inputs, not a finding."
+        exit 3
+    fi
+
+    # casper also creates the live user from /etc/casper.conf. If that name
+    # disagrees with the autologin user, the account that gets created and the
+    # account that gets logged in are different ones.
+    if [ -f "$ROOT/etc/casper.conf" ] && [ -n "$au" ]; then
+        cu="$(sed -n 's/^export USERNAME=//p' "$ROOT/etc/casper.conf" \
+              | tr -d '"' | head -1)"
+        if [ -n "$cu" ] && [ "$cu" != "$au" ]; then
+            echo "  FAIL  casper creates the live user '$cu' but autologin logs"
+            echo "        in '$au'; they must be the same account"
+            fail=1
+        elif [ -n "$cu" ]; then
+            echo "  ok    casper's live user and the autologin user are both $cu"
+        fi
+    fi
+
     # THE WAYLAND COMPOSITOR MUST EXIST.
     #
     # SDDM's default is `weston --shell=kiosk`, and Plasma does not depend on

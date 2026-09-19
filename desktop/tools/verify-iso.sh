@@ -104,7 +104,8 @@ else
     unsquashfs -d "$TMP/root" -f "$TMP/fs.squashfs" \
         '/etc' '/usr/bin' '/usr/share/icons/FacetUI' '/usr/share/color-schemes' \
         '/usr/share/plasma' '/usr/share/plymouth' \
-        '/usr/share/wayland-sessions' '/usr/share/xsessions' '/usr/lib' \
+        '/usr/share/wayland-sessions' '/usr/share/xsessions' \
+        '/usr/share/initramfs-tools' '/usr/lib' \
         >/dev/null 2>&1 || true
 
     if [ -d "$TMP/root/etc/xdg" ]; then

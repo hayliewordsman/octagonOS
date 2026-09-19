@@ -26,7 +26,13 @@ exec 2>/dev/null
 # The session bus belongs to the user Plasma is running as, and Plasma takes a
 # while to come up on a live image. Wait, rather than racing it and reporting
 # a failure that is really impatience.
-UID_N=1000
+# The uid is looked up from the account autologin actually names, rather
+# than assumed to be 1000. On this image they agree, but a hardcoded 1000 is
+# a silent wrong answer the day they stop agreeing -- and casper creating a
+# second uid-1000 account is exactly how that would happen.
+AUTOLOGIN_USER="$(sed -n 's/^User=//p' /etc/sddm.conf.d/*.conf /etc/sddm.conf \
+                  2>/dev/null | tail -1)"
+UID_N="$(id -u "${AUTOLOGIN_USER:-octagon}" 2>/dev/null || echo 1000)"
 BUS="/run/user/$UID_N/bus"
 
 # How long to wait. 180s was the first guess and it was wrong: under QEMU's
@@ -50,6 +56,7 @@ done
 
 if [ ! -S "$BUS" ]; then
     say "FAIL no session bus after ${WAIT}s; the desktop did not start"
+    say "     (waited on $BUS, for user ${AUTOLOGIN_USER:-octagon} uid $UID_N)"
 
     # SAY WHY, not just that. The first time this fired it reported the
     # symptom and nothing else, and finding the cause -- an autologin session
@@ -73,7 +80,7 @@ if [ ! -S "$BUS" ]; then
     say "sessions:        $(loginctl list-sessions --no-legend 2>/dev/null | wc -l) open"
     say "run/user:        $(ls /run/user 2>/dev/null | tr '\n' ' ')"
 
-    journalctl -u sddm.service -n 12 --no-pager 2>/dev/null \
+    journalctl -u sddm.service -n 40 --no-pager 2>/dev/null \
         | while IFS= read -r l; do say "sddm| $l"; done
 
     say "END"

@@ -214,6 +214,55 @@ EOF
         echo "       the autologin session name would not resolve." >&2
         exit 1
     fi
+    # --- casper, which configures autologin too, and wins ------------------
+    #
+    # casper writes /etc/sddm.conf from its initramfs at every boot:
+    #
+    #     cat >>/root/etc/sddm.conf <<EOF
+    #     [Autologin]
+    #     User=$USERNAME
+    #     Session=$sddm_session
+    #     EOF
+    #
+    # and sddm.conf(5) is explicit that the load order is
+    # /usr/lib/sddm/sddm.conf.d, then /etc/sddm.conf.d, then /etc/sddm.conf,
+    # "with the latter having highest precedence". So casper's file overrides
+    # everything written above -- which is why the chroot could be inspected
+    # after a build and look perfectly correct while the booted machine did
+    # something else entirely. The file does not exist until boot.
+    #
+    # Worse, what it writes cannot work here. It picks $sddm_session by
+    # looking for plasma.desktop in /usr/share/XSESSIONS only; this image's
+    # X11 entry is plasmax11.desktop and its Plasma session is Wayland, so
+    # the variable stays empty and the result is
+    #
+    #     [Autologin]
+    #     User=ubuntu
+    #     Session=
+    #
+    # An autologin with no session name does not log anyone in. SDDM falls
+    # back to its greeter, which is what three boots of this image did.
+    #
+    # The script predates Wayland sessions and has no way to name one, so it
+    # is removed rather than worked around. The initramfs is regenerated
+    # afterwards because that is where casper's scripts actually live.
+    rm -f "$CHROOT/usr/share/initramfs-tools/scripts/casper-bottom/15autologin"
+
+    # And casper creates the live user, at uid 1000, from this name. Setting
+    # it to ours means casper and this image agree on one user instead of
+    # fighting over the uid: user-setup-apply finds octagon already present
+    # and leaves it alone.
+    cat > "$CHROOT/etc/casper.conf" <<'EOF'
+# octagonOS: the live user is the one this image already ships, so casper's
+# user-setup finds it and does not create a second uid-1000 account.
+export USERNAME="octagon"
+export USERFULLNAME="octagonOS live session"
+export HOST="octagonos"
+export BUILD_SYSTEM="Ubuntu"
+EOF
+
+    in_chroot update-initramfs -u
+
     # Idempotent, because the chroot is deliberately reused between runs and
     # useradd on an existing user exits non-zero -- which under `set -e` ends
     # the build an hour in, on the one path that was supposed to be the fast
