@@ -34,7 +34,7 @@ BUS="/run/user/$UID_N/bus"
 # a session, and the self-test was reporting "the desktop did not start" about
 # a desktop that was still starting. Overridable from the kernel command line
 # so a slow machine can be given longer without rebuilding the image.
-WAIT=900
+WAIT=1800
 for arg in $(cat /proc/cmdline 2>/dev/null); do
     case "$arg" in
         octagonos.selftest.wait=*) WAIT="${arg#*=}" ;;
@@ -97,6 +97,17 @@ if ls /dev/dri/renderD* >/dev/null 2>&1; then
     say "OK   render node: $(ls /dev/dri/renderD* | tr '\n' ' ')"
 else
     say "FAIL no /dev/dri render node; KWin cannot use OpenGL"
+fi
+
+# 1b. Whether OpenGL was forced. Without this line a reader cannot tell a
+#     machine whose driver chose OpenGL from one that was overridden into it,
+#     and those support very different claims.
+if grep -qw octagonos.forcegl /proc/cmdline 2>/dev/null; then
+    say "INFO OpenGL compositing was FORCED (KWIN_COMPOSE=O2ES): this machine"
+    say "INFO has no GPU, so frames are drawn by the CPU. The effect running"
+    say "INFO here says nothing about how it performs on real hardware."
+else
+    say "INFO OpenGL was not forced; KWin chose its own scene"
 fi
 
 # 2. What KWin is actually compositing with.

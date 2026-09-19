@@ -149,23 +149,66 @@ else
         echo "  ok    autologin user $au exists"
     fi
 
-    # SDDM accepts the name with or without .desktop, and looks in both the
-    # wayland and X11 session directories.
+    # THE SESSION DIRECTORY MUST MATCH THE DISPLAY SERVER.
+    #
+    # This check used to accept a session file in either directory, and that
+    # is how the second boot failed: DisplayServer=wayland with Session=plasma
+    # looked correct and was, but SDDM resolves the autologin session ONLY in
+    # the directory belonging to the display server it is actually running.
+    # Accepting either is accepting a combination SDDM will not.
+    ds="$(sed -n 's/^DisplayServer=//p' "$sddm_conf" | head -1)"
+    ds="${ds:-x11}"
+    case "$ds" in
+        wayland) sdir=wayland-sessions ;;
+        *)       sdir=xsessions ;;
+    esac
+
     if [ -z "$as" ]; then
         echo "  FAIL  autologin names no session"; fail=1
     else
         sf="${as%.desktop}.desktop"
-        if [ -f "$ROOT/usr/share/wayland-sessions/$sf" ]; then
-            echo "  ok    autologin session $as resolves to wayland-sessions/$sf"
-        elif [ -f "$ROOT/usr/share/xsessions/$sf" ]; then
-            echo "  ok    autologin session $as resolves to xsessions/$sf"
+        if [ -f "$ROOT/usr/share/$sdir/$sf" ]; then
+            echo "  ok    autologin session $as is a $ds session ($sdir/$sf)"
         else
-            echo "  FAIL  autologin session '$as' matches no session file;"
-            echo "        available:" \
-                 "$(ls "$ROOT/usr/share/wayland-sessions" \
-                       "$ROOT/usr/share/xsessions" 2>/dev/null \
+            echo "  FAIL  DisplayServer=$ds, so SDDM looks for '$as' in $sdir"
+            echo "        only -- and $sdir/$sf is not there."
+            if [ -f "$ROOT/usr/share/wayland-sessions/$sf" ] \
+               || [ -f "$ROOT/usr/share/xsessions/$sf" ]; then
+                echo "        It exists in the OTHER directory, which SDDM will"
+                echo "        not use: it falls back to its greeter instead."
+            fi
+            echo "        available in $sdir:" \
+                 "$(ls "$ROOT/usr/share/$sdir" 2>/dev/null \
                     | grep '\.desktop$' | tr '\n' ' ')"
             fail=1
+        fi
+    fi
+
+    # THE WAYLAND COMPOSITOR MUST EXIST.
+    #
+    # SDDM's default is `weston --shell=kiosk`, and Plasma does not depend on
+    # weston. With it missing, DisplayServer=wayland cannot start and SDDM
+    # falls back to X11 silently -- which then makes the check above fail for
+    # a reason that looks unrelated. This is the actual first domino.
+    if [ "$ds" = wayland ]; then
+        cc="$(sed -n 's/^CompositorCommand=//p' "$sddm_conf" | head -1)"
+        if [ -z "$cc" ]; then
+            echo "  FAIL  DisplayServer=wayland but no CompositorCommand is set;"
+            echo "        SDDM's default is weston, which Plasma does not install"
+            fail=1
+        else
+            ccbin="${cc%% *}"
+            case "$ccbin" in
+                /*) ccpath="$ccbin" ;;
+                *)  ccpath="/usr/bin/$ccbin" ;;
+            esac
+            if [ -x "$ROOT$ccpath" ]; then
+                echo "  ok    wayland compositor $ccbin is present"
+            else
+                echo "  FAIL  CompositorCommand '$ccbin' is not in the image at"
+                echo "        $ccpath; the wayland display server cannot start"
+                fail=1
+            fi
         fi
     fi
 fi

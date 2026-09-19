@@ -177,6 +177,15 @@ if [ "$PROFILE" = desktop ]; then
     # does not exist does not produce an error anybody sees: autologin simply
     # does not happen and SDDM shows its greeter, which on a live image looks
     # like a wallpaper that never finishes loading. That is what it did.
+    # CompositorCommand is not optional here, and its default is a trap.
+    # SDDM ships CompositorCommand=weston --shell=kiosk, and weston is not
+    # installed -- Plasma does not depend on it. So DisplayServer=wayland
+    # could not start, SDDM fell back to X11 WITHOUT SAYING SO, and from an
+    # X11 display server a Wayland autologin session can never resolve: SDDM
+    # looks for the session only in the directory matching its display
+    # server. The visible result was a greeter, on a machine configured never
+    # to show one. kwin_wayland is already installed, being the compositor
+    # this whole image exists to run.
     cat > "$CHROOT/etc/sddm.conf.d/octagonos.conf" <<'EOF'
 [Autologin]
 User=octagon
@@ -184,7 +193,19 @@ Session=plasma
 
 [General]
 DisplayServer=wayland
+
+[Wayland]
+CompositorCommand=kwin_wayland --no-lockscreen
 EOF
+
+    # Check both halves in the image being built, rather than finding out
+    # twenty-five minutes into a boot.
+    for f in /usr/share/wayland-sessions/plasma.desktop /usr/bin/kwin_wayland; do
+        if [ ! -e "$CHROOT$f" ]; then
+            echo "FATAL: $f is missing; the autologin session cannot start." >&2
+            exit 1
+        fi
+    done
 
     # And check it, rather than trusting that I got the name right the second
     # time. The session file has to be there in the image being built.
@@ -211,6 +232,14 @@ EOF
     install -D -m 644 "$HERE/selftest/octagonos-selftest.service" \
         "$CHROOT/etc/systemd/system/octagonos-selftest.service"
     in_chroot systemctl enable octagonos-selftest.service
+
+    # And the OpenGL override, which is a separate flag on purpose: it is
+    # right for a machine with no GPU and wrong for a machine with one.
+    install -D -m 755 "$HERE/selftest/octagonos-forcegl.sh" \
+        "$CHROOT/usr/lib/octagonos/octagonos-forcegl.sh"
+    install -D -m 644 "$HERE/selftest/octagonos-forcegl.service" \
+        "$CHROOT/etc/systemd/system/octagonos-forcegl.service"
+    in_chroot systemctl enable octagonos-forcegl.service
     # busctl, kreadconfig6 and setpriv are what it reports with. kreadconfig6
     # lives in kf6-kconfig -- there is no kf6-kconfig-bin, whatever the split
     # in other frameworks would suggest. Plasma pulls kf6-kconfig in anyway,

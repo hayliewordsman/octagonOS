@@ -36,7 +36,7 @@ set -o pipefail
 
 ISO="${1:?usage: boot-iso-check.sh <image.iso> [out-dir]}"
 OUTDIR="${2:-$(dirname "$ISO")}"
-BOOT_TIMEOUT="${BOOT_TIMEOUT:-1800}"
+BOOT_TIMEOUT="${BOOT_TIMEOUT:-5400}"
 
 [ -f "$ISO" ] || { echo "[FAIL] no such image: $ISO"; exit 2; }
 command -v qemu-system-x86_64 >/dev/null || { echo "[FAIL] qemu-system-x86 is not installed"; exit 2; }
@@ -65,12 +65,16 @@ qemu-system-x86_64 \
     -device virtio-vga -display none \
     -drive file="$ISO",media=cdrom,readonly=on \
     -kernel "$WORK/vmlinuz" -initrd "$WORK/initrd" \
-    -append "boot=casper quiet splash octagonos.selftest console=ttyS0,115200" \
+    -append "boot=casper quiet splash octagonos.selftest octagonos.forcegl \
+             console=ttyS0,115200" \
     -serial "file:$SERIAL" \
     -monitor "unix:$MONITOR,server,nowait" \
     -rtc base=utc &
 QPID=$!
 
+echo "[*] octagonos.forcegl is set: this guest has no GPU, so KWin would"
+echo "    otherwise decline OpenGL and load no effects at all -- neither"
+echo "    FacetUI's nor its own blur. Frames here are drawn by the CPU."
 echo "[*] waiting for the session to report"
 deadline=$(( $(date +%s) + BOOT_TIMEOUT ))
 while [ "$(date +%s)" -lt "$deadline" ]; do

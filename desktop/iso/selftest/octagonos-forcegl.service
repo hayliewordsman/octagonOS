@@ -1,0 +1,15 @@
+[Unit]
+Description=octagonOS: force OpenGL compositing for a GPU-less test machine
+# Inert without the flag, so an ordinary boot never runs it.
+ConditionKernelCommandLine=octagonos.forcegl
+# Must land before anything logs a user in, since pam_env reads
+# /etc/environment once, when the session opens.
+Before=display-manager.service sddm.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/octagonos/octagonos-forcegl.sh
+
+[Install]
+WantedBy=graphical.target
